@@ -1,0 +1,11 @@
+**/datasets
+**/.vscode
+**/__pycache__
+**/checkpoints
+**/.ipynb_checkpoints
+**/tmp
+**/KAIR
+**/results
+**/pic_pairs
+**/*.zip
+**/dnz_results*
