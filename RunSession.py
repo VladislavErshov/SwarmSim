@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from src.system import MultiAgentSystem, LinearAgentNd
 import src.state_generator as gen
 import warnings
@@ -9,11 +10,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Initialize agents
-n_agents = 10
-cluster_data = [(0, 20), (0, -20)]
+n_agents = 100
+cluster_means = [(0, 5), (0, -5)]
+cluster_std = 1
 agent_dim = 2
 control_dim = 2
-goal_state = np.array([1000, 0])
+goal_state = np.array([30, 0])
 A = np.eye(agent_dim)
 B = np.eye(agent_dim, control_dim)
 val_each = 1 # validate each val_each iteration
@@ -21,6 +23,7 @@ val_each = 1 # validate each val_each iteration
 # Initialize obstacles [TODO]
 
 
+# It won't work since the linear MPC is implemented, TODO FIX
 def simple_descent():
     n_steps = 100
     mas = MultiAgentSystem(n_agents, agent_dim, goal_state)
@@ -45,20 +48,31 @@ def linear_mpc():
     Q = np.eye(agent_dim)
     R = np.eye(control_dim)
     P = np.zeros((agent_dim, agent_dim))
+    umin = None
+    umax = None
+
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
-                           state_gen=gen.uniform_cube, state_gen_args=[A, B, cluster_data, 1, (-10, 10)])
+                           state_gen=gen.random_blobs, 
+                           state_gen_args=[[A], [B], cluster_means, cluster_std, (-3, 3)])
     for sdx in range(n_steps):
         fstate = mas.get_full_state()
-        system_centroid = mas.get_cluster_centroids()[0]
+        cluster_centroids = mas.get_cluster_centroids()
         if sdx % val_each == 0:
+            n_clusters = mas.n_clusters
+            clust_labels = mas.clust_labels
             fig, ax = plt.subplots(figsize=(4, 4), dpi=140)
-            ax.scatter(fstate[:, 0], fstate[:, 1], s=5, c='#0000ff99', marker='.')
-            ax.scatter(goal_state[0], goal_state[1], s=10, c='r', marker='x')
-            ax.scatter(system_centroid[0], system_centroid[1], s=40, facecolors='none', edgecolors='#0000ff', marker='o')
-            ax.set_xlim(-3, 150)
-            ax.set_ylim(-5, 5)
+            ax.scatter(goal_state[0], goal_state[1], s=30, c='k', marker='x')
+            colors = cm.rainbow(np.linspace(0, 1, n_clusters))
+            for cdx in range(n_clusters):
+                agent_indices = np.where(clust_labels == cdx)[0]
+                ax.scatter(fstate[agent_indices, 0], fstate[agent_indices, 1], 
+                           s=5, c=colors[cdx], marker='.')
+                ax.scatter(cluster_centroids[cdx][0], cluster_centroids[cdx][1], 
+                           s=40, facecolors='none', edgecolors='#000000', marker='o')
+            ax.set_xlim(-15, goal_state[0])
+            ax.set_ylim(-10, 10)
             plt.show() 
-        mas.update_system_mpc(Q, R, P, n_t=2)
+        mas.update_system_mpc(Q, R, P, n_t=2, umax=umax, umin=umin)
 
 
 if __name__ == '__main__':

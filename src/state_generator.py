@@ -40,7 +40,7 @@ def random_blobs(agent_class, agent_dim, n_agents,
                  cluster_data=1, cluster_std=1, center_box=(-10, 10)):
     assert len(As) == len(Bs)   
     states = make_blobs(n_samples=n_agents, n_features=agent_dim, 
-                        centers=cluster_data, cluster_std=cluster_std, center_box=center_box)
+                        centers=cluster_data, cluster_std=cluster_std, center_box=center_box)[0]
     agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
     return agents
 
