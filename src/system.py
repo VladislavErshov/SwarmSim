@@ -1,10 +1,11 @@
 import numpy as np
 import src.state_generator as gen
 from src.opt import mpc_solver
+import hdbscan
 
 
 
-class AgentNd():
+class LinearAgentNd():
 
     def __init__(self,
                  A, B,
@@ -18,7 +19,7 @@ class AgentNd():
         self.state = state
         self.agent_dim = agent_dim
         
-    def micro_input(self, control_val):
+    def propagate_input(self, control_val):
         self.state = self.A @ self.state + self.B @ control_val
 
     def set_state(self, new_state):
@@ -41,47 +42,62 @@ class ClusterNd():
         self.agents = agents
         self.n_agents = n_agents
         self.full_cluster_state = np.zeros((n_agents, agent_dim))
-        for idx in range(n_agents):
-            self.full_cluster_state[idx] = agents[idx].get_state()
-        self.centroid = np.mean(self.full_cluster_state, axis=0)
+        self.centroid = self.update_centroid()
 
-    def meso_input(self, control_val):
-        self.full_cluster_state += control_val
-        self.centroid += control_val
-        for agent in self.agents:
-            agent.micro_input(control_val)
+    def propagate_input(self, control_val):
+        for agent in self.agents.values():
+            agent.propagate_input(control_val)
+        self.update_centroid()
 
     def update_centroid(self):
         for idx in range(self.n_agents):
-            self.full_cluster_state[idx] = self.agents[idx].get_state()
+            self.full_cluster_state[idx] = list(self.agents.values())[idx].get_state()
         self.centroid = np.mean(self.full_cluster_state, axis=0)
         return self.centroid
 
 
 class MultiAgentSystem():
 
-    def __init__(self, 
-                 n_agents=1,
-                 agent_dim=1,
-                 global_goal=np.array([0]),
-                 state_gen=gen.uniform_cube,
-                 state_gen_args=[2, 1, 1]) -> None:
-        self.agents = []
+    def __init__(self, n_agents=1, agent_dim=1, control_dim=1, global_goal=np.array([0]),
+                 state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1, (-10, 10)],
+                 clust_algo='hdbscan', clust_parameters=[1., 40, 5]) -> None:
         self.n_agents = n_agents
         self.agent_dim = agent_dim
+        self.control_dim = control_dim
         self.full_system_state = np.zeros((n_agents, agent_dim))
         self.system_goal = global_goal
-        for idx in range(n_agents):
-            agent = state_gen(AgentNd, agent_dim, *state_gen_args)
-            self.agents.append(agent)
-            self.full_system_state[idx] = agent.get_state()
-        self.clusters = [ClusterNd(self.agents, n_agents, agent_dim)]
-        self.cluster_centroids = [cluster.update_centroid() for cluster in self.clusters]
+        self.agents = state_gen(LinearAgentNd, agent_dim, n_agents, *state_gen_args)
+        self._re_eval_system(clust_algo, clust_parameters)
 
-    def _re_eval_full_state(self):
+    def _re_eval_clusters(self, algo='hdbscan', algo_parameters=[1., 40, 5]):
+        if algo == 'hdbscan':
+            alpha, leaf_size, min_cluster_size = algo_parameters
+            clusterer = hdbscan.HDBSCAN(alpha=alpha, leaf_size=leaf_size, min_cluster_size=min_cluster_size)
+            clusterer.fit(self.full_system_state)
+            self.clust_labels = clusterer.labels_
+            self.n_clusters = max(self.clust_labels) + 1
+            self.clusters = {}
+            self.cluster_centroids = {}
+            for cdx in range(self.n_clusters):
+                agent_indices = np.where(self.clust_labels == cdx)
+                n_agents_clust = agent_indices.size
+                cluster = ClusterNd((dict(loc_idx, self.agents[loc_idx]) for loc_idx in agent_indices),
+                                    n_agents_clust,
+                                    self.agent_dim)
+                self.clusters[cdx] = cluster 
+                self.cluster_centroids[cdx] = cluster.centroid
+        # TODO epsdel
+        #elif algo == 'epsdel':
+        #    epsv, delv = clust_parameters
+        #    assert delv <= epsv
+        else:
+            raise ValueError("Cluster identification algorithm not implemented")
+        pass
+
+    def _re_eval_system(self, clust_algo, clust_parameters):
         for idx, agent in enumerate(self.agents):
             self.full_system_state[idx] = agent.get_state()
-        self.cluster_centroids = [cluster.update_centroid() for cluster in self.clusters]
+        self._re_eval_clusters(clust_algo, clust_parameters)
 
     def get_n_agents(self):
         return self.n_agents        
@@ -97,40 +113,26 @@ class MultiAgentSystem():
     
     # Non-correct simplified implementation
     def update_system_simplified(self, step_size=0.01):
-        # TODO: add micro- and macro-scale control
         for cluster in self.clusters:
             centroid = cluster.get_centroid()
             meso_control = step_size * (self.system_goal - centroid)
-            cluster.meso_input(meso_control)
-            self._re_eval_full_state()
+            cluster.propagate_input(meso_control)
+            self._re_eval_system()
 
-
-class LinearMAS(MultiAgentSystem):
-
-    def __init__(self, 
-                 Q, R, P,
-                 n_agents=1, 
-                 agent_dim=1, 
-                 global_goal=np.array([0]), 
-                 state_gen=gen.uniform_cube,
-                 state_gen_args=[2, 1, 1]) -> None:
-        super().__init__(n_agents, agent_dim, global_goal, state_gen, state_gen_args)
-        self.Q = Q
-        self.R = R
-        self.P = P
-
-    def update_system_mpc(self, n_t=10):
-        for agent in self.agents:
+    def update_system_mpc(self, Q, R, P, n_t=10):
+        A = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        B = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
+        for adx, agent in self.agents.items():
             A = agent.A
             B = agent.B
             x0 = agent.state
             new_state, u = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                        self.Q, self.R, self.P, x0, 
+                                                        Q, R, P, x0, 
                                                         x_star_in=self.system_goal)
             #print(agent.state)
             #print(new_state[:, -1])
             #print(u)
             agent.set_state(new_state[:, -1])
-            self._re_eval_full_state()
+            self._re_eval_system()
 
 
