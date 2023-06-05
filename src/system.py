@@ -3,6 +3,7 @@ import src.state_generator as gen
 from src.opt import mpc_solver
 import hdbscan
 import scipy.cluster.hierarchy as hcluster
+import time
 
 
 
@@ -61,7 +62,7 @@ class MultiAgentSystem():
 
     def __init__(self, n_agents=1, agent_dim=1, control_dim=1, global_goal=np.array([0]),
                  state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1, (-10, 10)],
-                 clust_algo='hierarchy', clust_algo_parameters=[1]) -> None:
+                 clust_algo='hierarchy', clust_algo_parameters=[2]) -> None:
         self.n_agents = n_agents
         self.agent_dim = agent_dim
         self.control_dim = control_dim
@@ -70,11 +71,14 @@ class MultiAgentSystem():
         self.agents = state_gen(LinearAgentNd, agent_dim, n_agents, *state_gen_args)
         self.clust_algo = clust_algo
         self.clust_algo_parameters = clust_algo_parameters
+        self.average_goal_distance = np.inf
+        self.control_solution_time = 0.
         self._re_eval_system()
 
     def _re_eval_system(self):
         for idx, agent in self.agents.items():
             self.full_system_state[idx] = agent.get_state()
+        self.average_goal_distance = np.linalg.norm(self.full_system_state - self.system_goal, axis=1).mean(axis=0)
         self._re_eval_clusters()
 
     def _re_eval_clusters(self):
@@ -130,21 +134,43 @@ class MultiAgentSystem():
             cluster.propagate_input(meso_control)
             self._re_eval_system()
 
-    def update_system_mpc(self, Q, R, P, n_t=10, umax=None, umin=None):
-        #A = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
-        #B = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
-        for adx, agent in self.agents.items():
+    def update_system_mpc_distributed(self, Q, R, P, n_t=10, umax=None, umin=None):
+        time_0 = time.time()
+        cost_val = 0.
+        for _, agent in self.agents.items():
             A = agent.A
             B = agent.B
             x0 = agent.state
-            new_state, u = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                        Q, R, P, x0, 
-                                                        x_star_in=self.system_goal,
-                                                        umax=umax, umin=umin)
-            #print(agent.state)
-            #print(new_state[:, -1])
-            #print(u)
+            new_state, u, cost_val_agnt = mpc_solver.use_modeling_tool(A, B, n_t, 
+                                                                       Q, R, P, x0, 
+                                                                       x_star_in=self.system_goal,
+                                                                       umax=umax, umin=umin)
+            cost_val += cost_val_agnt
             agent.set_state(new_state[:, -1])
             self._re_eval_system()
+        self.control_solution_time += time.time() - time_0
+        cost_val /= self.n_agents
+        return self.average_goal_distance, cost_val
 
+    def update_system_mpc(self, Q, R, P, n_t=10, umax=None, umin=None):
+        time_0 = time.time()
+        A = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        B = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
+        for adx, agent in self.agents.items():
+            A[adx * self.agent_dim : (adx + 1) * self.agent_dim,
+              adx * self.agent_dim : (adx + 1) * self.agent_dim] = agent.A
+            B[adx * self.agent_dim : (adx + 1) * self.agent_dim,
+              adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+        x0 = self.full_system_state.flatten()
+        goal = np.kron(np.ones((self.n_agents)), self.system_goal)
+        new_state, u, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
+                                                              Q, R, P, x0, 
+                                                              x_star_in=goal,
+                                                              umax=umax, umin=umin)
+        self.control_solution_time += time.time() - time_0
+        for adx, agent in self.agents.items():
+            agent.set_state(new_state[adx * self.agent_dim : (adx + 1) * self.agent_dim, -1])
+        self._re_eval_system()
+        return self.average_goal_distance, cost_val
+        
 

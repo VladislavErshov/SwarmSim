@@ -51,6 +51,7 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
 
     prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
     prob.solve(verbose=False)
+    cost_val = prob.value
 
-    return x.value, u.value
+    return x.value, u.value, cost_val
 
