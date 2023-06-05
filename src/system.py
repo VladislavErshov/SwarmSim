@@ -55,29 +55,36 @@ class LinearClusterNd():
         self.agents = agents
         assert n_agents == len(agents)
         self.n_agents = n_agents
-        self.full_cluster_state = np.zeros((n_agents, agent_dim))
-        self.centroid = self.update_centroid()
+        self.agent_states = np.zeros((n_agents, agent_dim))
+        self.state = self.update_state()
+        self.A = 0.
+        self.B = 0.
+        for agent in self.agents.values():
+            self.A += agent.A
+            self.B += agent.B
+        self.A /= self.n_agents
+        self.B /= self.n_agents
 
     def propagate_input(self, control_val):
         """Propagate a meso-scale control action for all agents within the cluster."""
         for agent in self.agents.values():
             agent.propagate_input(control_val)
-        self.update_centroid()
+        self.update_state()
 
-    def update_centroid(self):
+    def update_state(self):
         """Update the centroid value according to the aggregated agent state."""
         for idx in range(self.n_agents):
-            self.full_cluster_state[idx] = list(self.agents.values())[idx].state
-        self.centroid = np.mean(self.full_cluster_state, axis=0)
-        return self.centroid
+            self.agent_states[idx] = list(self.agents.values())[idx].state
+        self.state = np.mean(self.agent_states, axis=0)
+        return self.state
 
 
 class MultiAgentSystem():
     """A multi-agent system dynamics simulator."""
 
     def __init__(self, n_agents=1, agent_dim=1, control_dim=1, global_goal=np.array([0]),
-                 state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1, 10],
-                 clust_algo='hierarchy', clust_algo_params=[2]) -> None:
+                 state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1],
+                 clust_algo='hierarchy', clust_algo_params=[1]) -> None:
         """
         Args:
             n_agents:               Number of agents
@@ -97,7 +104,7 @@ class MultiAgentSystem():
         self.n_agents = n_agents
         self.agent_dim = agent_dim
         self.control_dim = control_dim
-        self.full_system_state = np.zeros((n_agents, agent_dim))
+        self.agent_states = np.zeros((n_agents, agent_dim))
         self.system_goal = global_goal
         self.agents = state_gen(LinearAgentNd, agent_dim, n_agents, *state_gen_args)
         self.clust_algo = clust_algo
@@ -109,8 +116,8 @@ class MultiAgentSystem():
     def _re_eval_system(self):
         """Re-evaluate full system state by gathering each agent states"""
         for idx, agent in self.agents.items():
-            self.full_system_state[idx] = agent.state
-        self.avg_goal_dist = np.linalg.norm(self.full_system_state - self.system_goal, axis=1).mean(axis=0)
+            self.agent_states[idx] = agent.state
+        self.avg_goal_dist = np.linalg.norm(self.agent_states - self.system_goal, axis=1).mean(axis=0)
         self._re_eval_clusters()
 
     def _re_eval_clusters(self):
@@ -119,14 +126,14 @@ class MultiAgentSystem():
         algo_parameters = self.clust_algo_params
         if algo == 'hierarchy':
             thresh = algo_parameters[0]
-            self.clust_labels = hcluster.fclusterdata(self.full_system_state, thresh, criterion='distance') - 1
+            self.clust_labels = hcluster.fclusterdata(self.agent_states, thresh, criterion='distance') - 1
         elif algo == 'hdbscan':
             alpha, leaf_size, min_cluster_size = algo_parameters
             clusterer = hdbscan.HDBSCAN(alpha=alpha, 
                                         leaf_size=leaf_size, 
                                         min_cluster_size=min_cluster_size,
                                         min_samples=1)
-            clusterer.fit(self.full_system_state)
+            clusterer.fit(self.agent_states)
             self.clust_labels = clusterer.labels_
         # TODO epsdel
         #elif algo == 'epsdel':
@@ -137,7 +144,7 @@ class MultiAgentSystem():
         
         self.n_clusters = max(self.clust_labels) + 1
         self.clusters = {}
-        self.cluster_centroids = {}
+        self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
         for cdx in range(self.n_clusters):
             agent_indices = np.where(self.clust_labels == cdx)[0]
             n_agents_clust = agent_indices.size
@@ -145,10 +152,10 @@ class MultiAgentSystem():
                                       n_agents_clust,
                                       self.agent_dim)
             self.clusters[cdx] = cluster 
-            self.cluster_centroids[cdx] = cluster.centroid
+            self.cluster_states[cdx] = cluster.state
     
     # Non-correct simplified implementation
-    def update_system_simplified(self, step_size=0.01):
+    def update_system_descent(self, step_size=0.01):
         """
         Simple descent algorithm: cluster states are corrected 
         according to the fraction of the distance toward the goal.
@@ -157,8 +164,8 @@ class MultiAgentSystem():
             step_size:      Gradient step size
         """
         for cluster in self.clusters:
-            centroid = cluster.centroid
-            meso_control = step_size * (self.system_goal - centroid)
+            state = cluster.state
+            meso_control = step_size * (self.system_goal - state)
             cluster.propagate_input(meso_control)
             self._re_eval_system()
 
@@ -190,7 +197,8 @@ class MultiAgentSystem():
                                                                                      x_star_in=self.system_goal,
                                                                                      umax=umax, umin=umin)
             cost_val += cost_val_agnt
-            agent.set_state(state_dynamics[:, -1])
+            for tdx in range(n_t):
+                agent.propagate_input(u_dynamics[:, tdx])
             self._re_eval_system()
         self.control_solution_time += time.time() - time_0
         cost_val /= self.n_agents
@@ -204,9 +212,9 @@ class MultiAgentSystem():
         'n_agents * agent_dim'-dimensional vector.
 
         Args:
-            Q:              State-cost weight matrix
-            R:              Control-cost weight matrix
-            P:              Terminal-state-cost weight matrix
+            Q:              State-cost weight matrix (for a single agent)
+            R:              Control-cost weight matrix (for a single agent)
+            P:              Terminal-state-cost weight matrix (for a single agent)
             n_t:            Number of time steps in MPC
             umax, umin:     Control value constraints
         
@@ -222,16 +230,61 @@ class MultiAgentSystem():
               adx * self.agent_dim : (adx + 1) * self.agent_dim] = agent.A
             B[adx * self.agent_dim : (adx + 1) * self.agent_dim,
               adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
-        x0 = self.full_system_state.flatten()
+        x0 = self.agent_states.flatten()
         goal = np.kron(np.ones((self.n_agents)), self.system_goal)
+        Q_rdy = np.kron(np.eye(self.n_agents), Q)
+        R_rdy = np.kron(np.eye(self.n_agents), R)
+        P_rdy = np.kron(np.eye(self.n_agents), P)
         state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                                            Q, R, P, x0, 
+                                                                            Q_rdy, R_rdy, P_rdy, x0, 
                                                                             x_star_in=goal,
                                                                             umax=umax, umin=umin)
         self.control_solution_time += time.time() - time_0
-        for adx, agent in self.agents.items():
-            agent.set_state(state_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, -1])
+        for tdx in range(n_t):
+            for adx, agent in self.agents.items():
+                agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, tdx])
         self._re_eval_system()
         return self.avg_goal_dist, cost_val
         
+    def update_system_mpc_mesoonly(self, Q, R, P, n_t=10, umax=None, umin=None):
+        """
+        Cluster control MPC algorithm: agent states are corrected
+        according to a meso-scale controller derived by optimizing MPC cost
+        for the cluster states by combining each cluster state state into a 
+        'n_clusters * agent_dim'-dimensional vector.
+
+        Args:
+            Q:              State-cost weight matrix (for a single cluster)
+            R:              Control-cost weight matrix (for a single cluster)
+            P:              Terminal-state-cost weight matrix (for a single cluster)
+            n_t:            Number of time steps in MPC
+            umax, umin:     Control value constraints
+        
+        Returns:
+            avg_goal_dist:      Average distance toward the goal point for all agents
+            cost_val:           Value of the cost function at the final step        
+        """
+        time_0 = time.time()
+        A = np.zeros((self.agent_dim * self.n_clusters, self.agent_dim * self.n_clusters))
+        B = np.zeros((self.agent_dim * self.n_clusters, self.control_dim * self.n_clusters))
+        for adx, cluster in self.clusters.items():
+            A[adx * self.agent_dim : (adx + 1) * self.agent_dim,
+              adx * self.agent_dim : (adx + 1) * self.agent_dim] = cluster.A
+            B[adx * self.agent_dim : (adx + 1) * self.agent_dim,
+              adx * self.control_dim: (adx + 1) * self.control_dim] = cluster.B
+        x0 = self.cluster_states.flatten()
+        goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
+        Q_rdy = np.kron(np.eye(self.n_clusters), Q)
+        R_rdy = np.kron(np.eye(self.n_clusters), R)
+        P_rdy = np.kron(np.eye(self.n_clusters), P)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
+                                                                            Q_rdy, R_rdy, P_rdy, x0, 
+                                                                            x_star_in=goal,
+                                                                            umax=umax, umin=umin)
+        self.control_solution_time += time.time() - time_0
+        for cdx, cluster in self.clusters.items():
+            for tdx in range(n_t):
+                cluster.propagate_input(u_dynamics[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])
+        self._re_eval_system()
+        return self.avg_goal_dist, cost_val
 

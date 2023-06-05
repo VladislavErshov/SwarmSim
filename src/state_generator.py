@@ -54,7 +54,7 @@ def strict(agent_class, agent_dim=1, n_agents=1,
 
 def random_blobs(agent_class, agent_dim=1, n_agents=1, 
                  As=[1], Bs=[1], 
-                 cluster_data=1, cluster_std=1, cluster_diam=10):
+                 cluster_data=1, cluster_std=1):
     """
     Set initial agent states by randomized truncated gaussian blobs
     parametrized by cluster centroids and diameters.
@@ -70,14 +70,13 @@ def random_blobs(agent_class, agent_dim=1, n_agents=1,
         cluster_data:       [int]: number of clusters; centroid values randomized
                             [list of 'agent_dim'-tuples]: cluster centroid coordinates for each cluster
         cluster_std:        Standard deviation (spread) of agents within a cluster
-        cluster_diam:       Strict diameter of a cluster for the truncated distribution
     
     Returns:
         agents:             Dictionary of agent objects
     """
     assert len(As) == len(Bs)   
     states = make_blobs(n_samples=n_agents, n_features=agent_dim, 
-                        centers=cluster_data, cluster_std=cluster_std, center_box=(-cluster_diam, cluster_diam))[0]
+                        centers=cluster_data, cluster_std=cluster_std)[0]
     agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
     return agents
 

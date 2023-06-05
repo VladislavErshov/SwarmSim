@@ -14,8 +14,7 @@ warnings.filterwarnings('ignore')
 # Initialize agents
 n_agents = 1000 # number of agents
 cluster_means = [(0, 5), (0, -5)] # coordinates of initial cluster centroids for each cluster
-cluster_std = 1 # standard deviation for gaussian blob cluster initialization
-cluster_diam = 2 # diameter of a cluster (equal for all clusters)
+cluster_std = 0.5 # standard deviation for gaussian blob cluster initialization
 agent_dim = 2 # dimensionality of each agent
 control_dim = 2 # diemnsionality of control
 goal_state = np.array([100, 0]) # goal point coordinates
@@ -33,7 +32,7 @@ def simple_descent():
         pass
 
 
-def linear_mpc_distributred():
+def linear_mpc():
     Q = np.eye(agent_dim)
     R = np.eye(control_dim)
     P = np.zeros((agent_dim, agent_dim))
@@ -41,29 +40,14 @@ def linear_mpc_distributred():
     umax = None
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
                            state_gen=gen.random_blobs, 
-                           state_gen_args=[[A], [B], cluster_means, cluster_std, cluster_diam])
-    avg_goal_dist = mas.average_goal_distance
+                           state_gen_args=[[A], [B], cluster_means, cluster_std])
+    avg_goal_dist = mas.avg_goal_dist
     cost_val = np.inf
     for sdx in range(n_steps):
         plot_system(mas, goal_state, avg_goal_dist, cost_val)
-        avg_goal_dist, cost_val = mas.update_system_mpc_distributed(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
-    print(mas.control_solution_time)
-
-
-def linear_mpc():
-    Q = np.eye(agent_dim * n_agents)
-    R = np.eye(control_dim * n_agents)
-    P = np.zeros((agent_dim * n_agents, agent_dim * n_agents))
-    umin = None
-    umax = None
-    mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
-                           state_gen=gen.random_blobs, 
-                           state_gen_args=[[A], [B], cluster_means, cluster_std, cluster_diam])
-    avg_goal_dist = mas.average_goal_distance
-    cost_val = np.inf
-    for sdx in range(n_steps):
-        plot_system(mas, goal_state, avg_goal_dist, cost_val)
-        avg_goal_dist, cost_val = mas.update_system_mpc(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
+        #avg_goal_dist, cost_val = mas.update_system_mpc_distributed(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
+        #avg_goal_dist, cost_val = mas.update_system_mpc(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
+        avg_goal_dist, cost_val = mas.update_system_mpc_mesoonly(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
     print(mas.control_solution_time)
 
 
