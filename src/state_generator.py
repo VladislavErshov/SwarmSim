@@ -25,8 +25,25 @@ def _make_agents(agent_class, agent_dim, n_agents, As, Bs, states):
     return agents
 
 
-def strict(agent_class, agent_dim, n_agents, As=[1], Bs=[1], 
+def strict(agent_class, agent_dim=1, n_agents=1, 
+           As=[1], Bs=[1], 
            x0s=[[0,]]):
+    """
+    Set initial agent states by state values provided in the arguments.
+    
+    Args:
+        agent_class:        Class of an agent
+        agent_dim:          Agent dimensionality
+        n_agents:           Number of agents in the system to initialize
+        As:                 State transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        Bs:                 Control transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        x0s:                Initial state values for all agents
+    
+    Returns:
+        agents:             Dictionary of agent objects
+    """
     assert n_agents == np.array(x0s).shape[0]
     assert agent_dim == np.array(x0s).shape[1]
     assert len(As) == len(Bs)
@@ -35,12 +52,32 @@ def strict(agent_class, agent_dim, n_agents, As=[1], Bs=[1],
     return agents
 
 
-def random_blobs(agent_class, agent_dim, n_agents, 
+def random_blobs(agent_class, agent_dim=1, n_agents=1, 
                  As=[1], Bs=[1], 
-                 cluster_data=1, cluster_std=1, center_box=(-10, 10)):
+                 cluster_data=1, cluster_std=1, cluster_diam=10):
+    """
+    Set initial agent states by randomized truncated gaussian blobs
+    parametrized by cluster centroids and diameters.
+    
+    Args:
+        agent_class:        Class of an agent
+        agent_dim:          Agent dimensionality
+        n_agents:           Number of agents in the system to initialize
+        As:                 State transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        Bs:                 Control transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        cluster_data:       [int]: number of clusters; centroid values randomized
+                            [list of 'agent_dim'-tuples]: cluster centroid coordinates for each cluster
+        cluster_std:        Standard deviation (spread) of agents within a cluster
+        cluster_diam:       Strict diameter of a cluster for the truncated distribution
+    
+    Returns:
+        agents:             Dictionary of agent objects
+    """
     assert len(As) == len(Bs)   
     states = make_blobs(n_samples=n_agents, n_features=agent_dim, 
-                        centers=cluster_data, cluster_std=cluster_std, center_box=center_box)[0]
+                        centers=cluster_data, cluster_std=cluster_std, center_box=(-cluster_diam, cluster_diam))[0]
     agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
     return agents
 
