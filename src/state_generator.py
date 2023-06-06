@@ -1,13 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_blobs
-import yaml
 
-
-
-with open('cfg/seed.yaml') as f:
-    data = yaml.load(f, Loader=yaml.FullLoader)
-    rnd_seed = data['RND_SEED']
-    np.random.seed(rnd_seed)
 
 
 def _make_agents(agent_class, agent_dim, n_agents, As, Bs, states):

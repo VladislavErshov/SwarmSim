@@ -2,6 +2,7 @@
 
 import numpy as np
 import cvxpy
+from cvxpy.atoms.affine.wraps import psd_wrap
 
 
 
@@ -13,6 +14,9 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
     solve MPC with modeling tool for test
     """
     (nx, nu) = B.shape
+    Q = psd_wrap(Q)
+    R = psd_wrap(R)
+    P = psd_wrap(P)
 
     # mpc calculation
     x = cvxpy.Variable((nx, N + 1))
