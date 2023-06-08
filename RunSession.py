@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 n_agents = 1000 # number of agents
 cluster_means = [(0, 5), (0, -5)] # coordinates of initial cluster centroids for each cluster
 cluster_std = 0.5 # standard deviation for gaussian blob cluster initialization
-clust_thresh = 0.5 # hierarchy clusterization threshold
+clust_eps = 1 # epsilon-delta clustering parameter epsilon
 agent_dim = 2 # dimensionality of each agent
 control_dim = 2 # diemnsionality of control
 goal_state = np.array([10, 0]) # goal point coordinates
@@ -27,6 +27,8 @@ A = np.eye(agent_dim) # initial matrix A (state transition) for a linear agent
 B = np.eye(agent_dim, control_dim) # initial matrix B (control transition) for a linear agent
 n_steps = 5 # number of MPC iterations
 mpc_n_t = 15 # number of time steps per a single MPC iteration
+mpc_n_t2 = 3 # number of time steps per a single MPC iteration for the micro-scale term
+rad_max = 2. # target cluster radius maximum
 
 # Initialize obstacles [TODO]
 
@@ -46,14 +48,18 @@ def linear_mpc():
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
                            state_gen=gen.random_blobs, 
                            state_gen_args=[[A], [B], cluster_means, cluster_std],
-                           clust_algo_params=[clust_thresh])
+                           clust_algo_params=[clust_eps, clust_eps])
     avg_goal_dist = mas.avg_goal_dist
     cost_val = np.inf
     for sdx in range(n_steps):
         plot_system(mas, goal_state, avg_goal_dist, cost_val)
         #avg_goal_dist, cost_val = mas.update_system_mpc_distributed(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
         #avg_goal_dist, cost_val = mas.update_system_mpc(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
-        avg_goal_dist, cost_val = mas.update_system_mpc_mesoonly(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
+        #avg_goal_dist, cost_val = mas.update_system_mpc_mesoonly(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
+        avg_goal_dist, cost_val = mas.update_system_mpc_mesocoupling(Q, R, P, 
+                                                                     n_t_mes=mpc_n_t, n_t_mic=mpc_n_t2, 
+                                                                     rad_max=rad_max, 
+                                                                     umax=umax, umin=umin)
     print("Total optimization time (s):", mas.control_solution_time)
     print("Final cost:", cost_val)
     print("Final average goal distance:", avg_goal_dist)
