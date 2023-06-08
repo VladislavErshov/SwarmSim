@@ -221,7 +221,7 @@ class MultiAgentSystem():
         self._re_eval_system()
         return self.avg_goal_dist, cost_val
 
-    def update_system_mpc_mesocoupling(self, Q, R, P, n_t_mes=8, n_t_mic=2, rad_max=10., umax=None, umin=None):
+    def update_system_mpc_mesocoupling(self, Q, R, P, n_t_mes=8, n_t_mic=2, rad_max=10., lap_lambda=1., umax=None, umin=None):
         """
         Cluster control with coupling MPC algorithm: agent states are corrected
         according to a meso- and micro- scale controllers derived by optimizing 
@@ -241,6 +241,7 @@ class MultiAgentSystem():
             n_t_mes:        Number of time steps in the meso-scale part of MPC
             n_t_mic:        Number of time steps in the micro-scale part of MPC
             rad_max:        Target maximum cluster radius, used to activate coupling
+            lap_lambda:     Coupling weight in the cost functional
             umax, umin:     Control value constraints
         
         Returns:
@@ -276,7 +277,7 @@ class MultiAgentSystem():
         R_mic = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_clusters), P)
         cl_dyn, ag_dyn, u_meso, u_micro, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes,
-                                                                                  A_mic, B_mic, n_t_mic, R_mic, x0_mic, lap_mat_aug, 0.01,
+                                                                                  A_mic, B_mic, n_t_mic, R_mic, x0_mic, lap_mat_aug, lap_lambda,
                                                                                   umax_mes=umax, umin_mes=umin,
                                                                                   umax_mic=umax, umin_mic=umin,
                                                                                   x_star_in=goal)
