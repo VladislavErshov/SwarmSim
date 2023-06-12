@@ -4,6 +4,24 @@ import numpy as np
 
 
 
+rename = {
+    'n_steps': 'number of max time steps',
+    'n_agents': 'number of agents',
+    'micro': 'micro-scale strategy',
+    'mesocoup': 'proposed hybrid strategy',
+    'control_strategy': 'control strategy',
+    'solution_time': 'solution time',
+    'cost_val': 'cost value',
+    'avg_goal_dist': 'average distance to the goal',
+}
+
+units = {
+    'solution_time': 'seconds',
+    'cost_val': 'cost',
+    'avg_goal_dist': r'$\ell_2$ distance',
+}
+
+
 def system_state(mas, goal_state, avg_goal_dist, cost_val):
     """
     Plot system state.
@@ -37,14 +55,14 @@ def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols):
     colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=140)
         for sdx, (strat, df) in enumerate(dfs_perstrat.items()):
             ax.errorbar(xvalues, df[means], df[stds], 
                         c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
-                        label=strat)
+                        label=rename[strat])
             ax.grid('major')
-            ax.set_title(data_name)
-            ax.set_ylabel('value')
-            ax.set_xlabel(param_col)
+            ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
+            ax.set_ylabel(f'value, {units[data_name]}')
+            ax.set_xlabel(rename[param_col])
             ax.legend()
         plt.show()
