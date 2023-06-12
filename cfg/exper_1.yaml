@@ -1,3 +1,0 @@
-n_steps: [5, 10]
-n_agents: [100]
-control_strategy: ['micro', 'mesocoup']

@@ -33,5 +33,18 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val):
     plt.show() 
 
 
-def exprt_results():
-    pass
+def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols):
+    colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
+    for means, stds in zip(mean_cols, std_cols):
+        data_name = means[:-5]
+        fig, ax = plt.subplots(figsize=(4, 4), dpi=140)
+        for sdx, (strat, df) in enumerate(dfs_perstrat.items()):
+            ax.errorbar(xvalues, df[means], df[stds], 
+                        c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
+                        label=strat)
+            ax.grid('major')
+            ax.set_title(data_name)
+            ax.set_ylabel('value')
+            ax.set_xlabel(param_col)
+            ax.legend()
+        plt.show()

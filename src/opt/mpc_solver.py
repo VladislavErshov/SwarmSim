@@ -11,7 +11,7 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
                       xmin=None, xmax=None,
                       x_star_in=None):
     """
-    solve MPC with modeling tool for test
+    Solve a simple conventional MPC problem 
     """
     (nx, nu) = B.shape
     Q = psd_wrap(Q)

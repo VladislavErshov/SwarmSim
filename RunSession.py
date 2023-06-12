@@ -25,7 +25,7 @@ def product_dict(**kwargs):
         yield dict(zip(keys, instance))
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', help="Config name", required=False, default='exper_1')
+parser.add_argument('-c', '--config', help="Config name", required=False, default='exprt_1')
 args = parser.parse_args()
 
 # Initialize obstacles [TODO]
