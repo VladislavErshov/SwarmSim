@@ -4,7 +4,7 @@ import numpy as np
 
 
 
-def plot_system(mas, goal_state, avg_goal_dist, cost_val):
+def system_state(mas, goal_state, avg_goal_dist, cost_val):
     """
     Plot system state.
 
@@ -31,3 +31,7 @@ def plot_system(mas, goal_state, avg_goal_dist, cost_val):
     ax.set_xlim(-5, goal_state[0] * 1.2)
     ax.set_ylim(-10, 10)
     plt.show() 
+
+
+def exprt_results():
+    pass
