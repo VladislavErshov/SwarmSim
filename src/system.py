@@ -5,7 +5,7 @@ import time
 
 import src.state_generator as gen
 from src.clustering import epsdel_clustering
-from src.opt import mpc_solver
+from src.optimizer import mpc_solver
 
 
 

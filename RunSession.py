@@ -9,6 +9,7 @@ import pandas as pd
 from src.system import MultiAgentSystem
 import src.state_generator as gen
 import src.plot.plotter as pltr
+from src.multiprocessing.mp_wrapper import mp_kwargs_wrapper
 
 
 
@@ -42,8 +43,8 @@ def linear_mpc(
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
         u_bound = 2, # control constraint absolute value
         n_steps = 10, # number of MPC iterations
-        mpc_n_t = 15, # number of time steps per a single MPC iteration
-        mpc_n_t2 = 3, # number of time steps per a single MPC iteration for the micro-scale term
+        mpc_n_t = 16, # number of time steps per a single MPC iteration
+        mpc_n_t2 = 2, # number of time steps per a single MPC iteration for the micro-scale term
         rad_max = 2., # target cluster radius maximum
         lap_lambda = 1., # coupling weight
         control_strategy = 'mesocoup', # control strategy
@@ -94,10 +95,15 @@ if __name__ == '__main__':
     with open(f'cfg/metaparams.yaml') as f:
         metaparams = yaml.load(f, Loader=yaml.FullLoader)
     n_exper_runs = metaparams['n_exper_runs']
+    do_mp = metaparams['multiprocess']
 
     # Results initialization
     os.makedirs('results/', exist_ok=True)
     df_path = f'results/{config_name}.csv'
+    if os.path.exists(df_path):
+        df_header = False
+    else:
+        df_header = True
 
     exprt_keys = exprts[0].keys()
     df_dict = {key: [] for key in exprt_keys} | {'solution_time_MEAN': [],
@@ -110,23 +116,28 @@ if __name__ == '__main__':
     for exprt in exprts:
         print(exprt)
         outs = []
-        for edx in range(n_exper_runs):
-            task_out = linear_mpc(**exprt)
-            outs.append(task_out)
+        if do_mp:
+            exprt_list = [exprt for _ in range(n_exper_runs)]
+            outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
+        else:
+            for edx in range(n_exper_runs):
+                task_out = linear_mpc(**exprt)
+                outs.append(task_out)
         outs = np.array(outs)
         out_means = np.mean(outs, axis=0) 
         out_stds = np.std(outs, axis=0) 
         for key in exprt_keys: 
-            df_dict[key].append(exprt[key]) 
+            df_dict[key] = [exprt[key]] 
     
-        df_dict['solution_time_MEAN'].append(out_means[0])
-        df_dict['solution_time_STD'].append(out_stds[0])
-        df_dict['cost_val_MEAN'].append(out_means[1])
-        df_dict['cost_val_STD'].append(out_stds[1])
-        df_dict['avg_goal_dist_MEAN'].append(out_means[2])
-        df_dict['avg_goal_dist_STD'].append(out_stds[2])
+        df_dict['solution_time_MEAN'] = [out_means[0]]
+        df_dict['solution_time_STD'] = [(out_stds[0])]
+        df_dict['cost_val_MEAN'] = [(out_means[1])]
+        df_dict['cost_val_STD'] = [(out_stds[1])]
+        df_dict['avg_goal_dist_MEAN'] = [(out_means[2])]
+        df_dict['avg_goal_dist_STD'] = [(out_stds[2])]
     
-    df = pd.DataFrame.from_dict(df_dict)
-    df.to_csv(df_path, mode='w', header=True, index=False)
+        df = pd.DataFrame.from_dict(df_dict)
+        df.to_csv(df_path, mode='a', header=df_header, index=False)
+        df_header = False
 
         
