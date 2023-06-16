@@ -6,12 +6,12 @@ from cvxpy.atoms.affine.wraps import psd_wrap
 
 
 
-def use_modeling_tool(A, B, N, Q, R, P, x0,
-                      umax=None, umin=None, 
-                      xmin=None, xmax=None,
-                      x_star_in=None, coll_d=None):
+def conventional_solve(A, B, N, Q, R, P, x0, adim,
+                       umax=None, umin=None, 
+                       xmin=None, xmax=None,
+                       x_star_in=None, coll_d=None):
     """
-    Solve a conventional MPC problem with collision avoidance
+    Solve a multi-agent MPC problem with collision avoidance
     """
     (nx, nu) = B.shape
     Q = psd_wrap(Q)
@@ -40,9 +40,11 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
         if xmax is not None:
             constrlist += [x[:, t] <= xmax[:, 0]]
 
+        # TODO: make convex
         if coll_d is not None:
-            for idx in range(nx):
-                constrlist += [cvxpy.norm2(x[:, t] - x[idx, t]) >= coll_d]
+            for idx in range(nx//adim):
+                for jdx in range(idx+1, nx//adim):
+                    constrlist += [cvxpy.norm2(x[idx * adim : (idx+1) * adim, t] - x[idx * adim : (idx+1) * adim, t]) >= coll_d]
 
     costlist += 0.5 * cvxpy.quad_form(x[:, N], P)  # terminal cost
     if xmin is not None:
@@ -64,7 +66,7 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
     return x.value, u.value, cost_val
 
 
-def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes,
+def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, agent_dim,
                        A_mic, B_mic, N_mic, R_mic, x0_mic, L=None, L_lambda=1., 
                        umax_mes=None, umin_mes=None, umax_mic=None, umin_mic=None,
                        xmin_mes=None, xmax_mes=None, xmin_mic=None, xmax_mic=None,
@@ -132,9 +134,11 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes,
             if xmax_mic is not None:
                 constrlist += [x_mic[:, t] <= xmax_mic[:, 0]]
 
+            # TODO: make convex
             if coll_d is not None:
-                for idx in range(nx_mic):
-                    constrlist += [cvxpy.norm2(x_mic[:, t] - x_mic[idx, t]) >= coll_d]
+                for idx in range(nx_mic//adim):
+                    for jdx in range(idx+1, nx_mic//adim - 1):
+                        constrlist += [cvxpy.norm2(x_mic[idx * adim : (idx+1) * adim, t] - x_mic[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
         if umax_mic is not None:
             constrlist += [u_mic <= umax_mic]  # input constraints
