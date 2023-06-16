@@ -30,7 +30,9 @@ class MultiAgentSystem():
                 ________________________________________________
                 epsdel      | epsilon, delta
                 hdbscan     | alpha, leaf_size, min_cluster_size
-            coll_d:                 Agent diameter for collision avoidance [TODO: different agent sizes]
+            coll_d:                 Agent diameter for collision avoidance 
+                                    [NOTE: LEAVE IT None FOR NOW!!!]
+                                    [TODO: different agent sizes]
         """
         self.n_agents = n_agents
         self.agent_dim = agent_dim
@@ -40,7 +42,7 @@ class MultiAgentSystem():
         self.agents = state_gen(LinearAgentNd, agent_dim, n_agents, *state_gen_args)
         self.clust_algo = clust_algo
         self.clust_algo_params = clust_algo_params
-        self.avg_goal_dist = np.inf
+        self.avg_goal_dist = []
         self.control_solution_time = 0.
         self.laplacian = None
         self.coll_d = coll_d
@@ -50,7 +52,7 @@ class MultiAgentSystem():
         """Re-evaluate full system state by gathering each agent states"""
         for idx, agent in self.agents.items():
             self.agent_states[idx] = agent.state
-        self.avg_goal_dist = np.linalg.norm(self.agent_states - self.system_goal, axis=1).mean(axis=0)
+        self.avg_goal_dist.append(np.linalg.norm(self.agent_states - self.system_goal, axis=1).mean(axis=0))
         self._re_eval_clusters()
 
     def _re_eval_clusters(self):
@@ -115,7 +117,7 @@ class MultiAgentSystem():
             umax, umin:     Control value constraints
         
         Returns:
-            avg_goal_dist:      Average distance toward the goal point for all agents
+            avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
         time_0 = time.time()
@@ -124,11 +126,11 @@ class MultiAgentSystem():
             A = agent.A
             B = agent.B
             x0 = agent.state
-            state_dynamics, u_dynamics, cost_val_agnt = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                                                     Q, R, P, x0, 
-                                                                                     x_star_in=self.system_goal,
-                                                                                     coll_d=self.coll_d,
-                                                                                     umax=umax, umin=umin)
+            state_dynamics, u_dynamics, cost_val_agnt = mpc_solver.conventional_solve(A, B, n_t, 
+                                                                                      Q, R, P, x0, self.agent_dim,
+                                                                                      x_star_in=self.system_goal,
+                                                                                      coll_d=self.coll_d,
+                                                                                      umax=umax, umin=umin)
             cost_val += cost_val_agnt
             #for tdx in range(n_t):
             #    agent.propagate_input(u_dynamics[:, tdx])
@@ -169,11 +171,11 @@ class MultiAgentSystem():
         Q = np.kron(np.eye(self.n_agents), Q)
         R = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_agents), P)
-        state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                                            Q, R, P, x0, 
-                                                                            x_star_in=goal,
-                                                                            coll_d=self.coll_d,
-                                                                            umax=umax, umin=umin)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t, 
+                                                                             Q, R, P, x0, self.agent_dim,
+                                                                             x_star_in=goal,
+                                                                             coll_d=self.coll_d,
+                                                                             umax=umax, umin=umin)
         self.control_solution_time += time.time() - time_0
         for adx, agent in self.agents.items():
             #for tdx in range(n_t):
@@ -213,11 +215,11 @@ class MultiAgentSystem():
         Q = np.kron(np.eye(self.n_clusters), Q)
         R = np.kron(np.eye(self.n_clusters), R)
         P = np.kron(np.eye(self.n_clusters), P)
-        state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
-                                                                            Q, R, P, x0, 
-                                                                            x_star_in=goal,
-                                                                            coll_d=self.coll_d,
-                                                                            umax=umax, umin=umin)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t, 
+                                                                             Q, R, P, x0, self.agent_dim,
+                                                                             x_star_in=goal,
+                                                                             coll_d=self.coll_d,
+                                                                             umax=umax, umin=umin)
         self.control_solution_time += time.time() - time_0
         for cdx, cluster in self.clusters.items():
             #for tdx in range(n_t):
@@ -284,7 +286,7 @@ class MultiAgentSystem():
         R_mes = np.kron(np.eye(self.n_clusters), R)
         R_mic = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_clusters), P)
-        cl_dyn, ag_dyn, u_meso, u_micro, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes,
+        cl_dyn, ag_dyn, u_meso, u_micro, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes, self.agent_dim,
                                                                                   A_mic, B_mic, n_t_mic, R_mic, x0_mic, lap_mat_aug, lap_lambda,
                                                                                   x_star_in=goal, coll_d=self.coll_d,
                                                                                   umax_mes=umax, umin_mes=umin,

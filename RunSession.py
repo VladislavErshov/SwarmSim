@@ -47,7 +47,7 @@ def linear_mpc(
         mpc_n_t2 = 2, # number of time steps per a single MPC iteration for the micro-scale term
         rad_max = 2., # target cluster radius maximum
         lap_lambda = 1., # coupling weight
-        coll_d = None, # agent diameter for collision avoidance
+        coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
     ):
@@ -100,20 +100,34 @@ if __name__ == '__main__':
 
     # Results initialization
     os.makedirs('results/', exist_ok=True)
-    df_path = f'results/{config_name}.csv'
-    if os.path.exists(df_path):
-        df_header = False
+    df_res_path = f'results/{config_name}.csv'
+    df_dyn_path = f'results/{config_name}_dyn.csv'
+
+    if os.path.exists(df_res_path):
+        df_res_header = False
     else:
-        df_header = True
+        df_res_header = True
 
     exprt_keys = exprts[0].keys()
-    df_dict = {key: [] for key in exprt_keys} | {'solution_time_MEAN': [],
-                                                 'solution_time_STD': [],
-                                                 'cost_val_MEAN': [],
-                                                 'cost_val_STD': [],
-                                                 'avg_goal_dist_MEAN': [],
-                                                 'avg_goal_dist_STD': [],}
+    df_res_dict = {key: [] for key in exprt_keys} | {'solution_time_MEAN': [],
+                                                     'solution_time_STD': [],
+                                                     'cost_val_MEAN': [],
+                                                     'cost_val_STD': [],
+                                                     'avg_goal_dist_MEAN': [],
+                                                     'avg_goal_dist_STD': [],}
 
+    print("DYNAMICS RUN")
+    dyn_exprt_micro = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'micro'}
+    dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
+    print(dyn_exprt_micro)
+    print(dyn_exprt_mesocoup)
+    _, _, dyn_micro = linear_mpc(**dyn_exprt_micro)
+    _, _, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup)
+    df_dyn = pd.DataFrame.from_dict({'micro': dyn_micro, 'mesocoup': dyn_mesocoup})
+    df_dyn.to_csv(df_dyn_path, mode='a', header=True, index=False)
+
+    print("STATISTICS RUN")
+    """
     for exprt in exprts:
         print(exprt)
         outs = []
@@ -124,21 +138,23 @@ if __name__ == '__main__':
             for edx in range(n_exper_runs):
                 task_out = linear_mpc(**exprt)
                 outs.append(task_out)
-        outs = np.array(outs)
+        outs = np.array([(*out[:-1], out[-1][-1]) for out in outs])
         out_means = np.mean(outs, axis=0) 
         out_stds = np.std(outs, axis=0) 
         for key in exprt_keys: 
-            df_dict[key] = [exprt[key]] 
+            df_res_dict[key] = [exprt[key]] 
     
-        df_dict['solution_time_MEAN'] = [out_means[0]]
-        df_dict['solution_time_STD'] = [(out_stds[0])]
-        df_dict['cost_val_MEAN'] = [(out_means[1])]
-        df_dict['cost_val_STD'] = [(out_stds[1])]
-        df_dict['avg_goal_dist_MEAN'] = [(out_means[2])]
-        df_dict['avg_goal_dist_STD'] = [(out_stds[2])]
+        df_res_dict['solution_time_MEAN'] = [out_means[0]]
+        df_res_dict['solution_time_STD'] = [(out_stds[0])]
+        df_res_dict['cost_val_MEAN'] = [(out_means[1])]
+        df_res_dict['cost_val_STD'] = [(out_stds[1])]
+        df_res_dict['avg_goal_dist_MEAN'] = [(out_means[2])]
+        df_res_dict['avg_goal_dist_STD'] = [(out_stds[2])]
     
-        df = pd.DataFrame.from_dict(df_dict)
-        df.to_csv(df_path, mode='a', header=df_header, index=False)
-        df_header = False
+        df_res = pd.DataFrame.from_dict(df_res_dict)
+        df_res.to_csv(df_res_path, mode='a', header=df_res_header, index=False)
+        df_res_header = False
+    """
+    
 
         
