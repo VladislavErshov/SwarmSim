@@ -47,6 +47,7 @@ def linear_mpc(
         mpc_n_t2 = 2, # number of time steps per a single MPC iteration for the micro-scale term
         rad_max = 2., # target cluster radius maximum
         lap_lambda = 1., # coupling weight
+        coll_d = None, # agent diameter for collision avoidance
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
     ):
@@ -58,7 +59,7 @@ def linear_mpc(
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
                            state_gen=gen.random_blobs, 
                            state_gen_args=[[A], [B], cluster_means, cluster_std],
-                           clust_algo_params=[clust_eps, clust_eps])
+                           clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
     avg_goal_dist = mas.avg_goal_dist
     cost_val = np.inf
     for sdx in range(n_steps):
@@ -72,9 +73,9 @@ def linear_mpc(
             avg_goal_dist, cost_val = mas.update_system_mpc_mesoonly(Q, R, P, n_t=mpc_n_t, umax=umax, umin=umin)
         elif control_strategy == 'mesocoup':
             avg_goal_dist, cost_val = mas.update_system_mpc_mesocoupling(Q, R, P, 
-                                                                        n_t_mes=mpc_n_t, n_t_mic=mpc_n_t2, 
-                                                                        rad_max=rad_max, lap_lambda=lap_lambda,
-                                                                        umax=umax, umin=umin)
+                                                                         n_t_mes=mpc_n_t, n_t_mic=mpc_n_t2, 
+                                                                         rad_max=rad_max, lap_lambda=lap_lambda,
+                                                                         umax=umax, umin=umin)
         else:
             raise NotImplementedError(f"Unknown control strategy '{control_strategy}'")
     solution_time = mas.control_solution_time

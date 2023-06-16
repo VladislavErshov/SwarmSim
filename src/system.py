@@ -14,7 +14,7 @@ class MultiAgentSystem():
 
     def __init__(self, n_agents=1, agent_dim=1, control_dim=1, global_goal=np.array([0]),
                  state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1],
-                 clust_algo='epsdel', clust_algo_params=[1, 1]) -> None:
+                 clust_algo='epsdel', clust_algo_params=[1, 1], coll_d=None) -> None:
         """
         Args:
             n_agents:               Number of agents
@@ -30,6 +30,7 @@ class MultiAgentSystem():
                 ________________________________________________
                 epsdel      | epsilon, delta
                 hdbscan     | alpha, leaf_size, min_cluster_size
+            coll_d:                 Agent diameter for collision avoidance [TODO: different agent sizes]
         """
         self.n_agents = n_agents
         self.agent_dim = agent_dim
@@ -42,6 +43,7 @@ class MultiAgentSystem():
         self.avg_goal_dist = np.inf
         self.control_solution_time = 0.
         self.laplacian = None
+        self.coll_d = coll_d
         self._re_eval_system()
 
     def _re_eval_system(self):
@@ -125,6 +127,7 @@ class MultiAgentSystem():
             state_dynamics, u_dynamics, cost_val_agnt = mpc_solver.use_modeling_tool(A, B, n_t, 
                                                                                      Q, R, P, x0, 
                                                                                      x_star_in=self.system_goal,
+                                                                                     coll_d=self.coll_d,
                                                                                      umax=umax, umin=umin)
             cost_val += cost_val_agnt
             #for tdx in range(n_t):
@@ -169,6 +172,7 @@ class MultiAgentSystem():
         state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
                                                                             Q, R, P, x0, 
                                                                             x_star_in=goal,
+                                                                            coll_d=self.coll_d,
                                                                             umax=umax, umin=umin)
         self.control_solution_time += time.time() - time_0
         for adx, agent in self.agents.items():
@@ -212,6 +216,7 @@ class MultiAgentSystem():
         state_dynamics, u_dynamics, cost_val = mpc_solver.use_modeling_tool(A, B, n_t, 
                                                                             Q, R, P, x0, 
                                                                             x_star_in=goal,
+                                                                            coll_d=self.coll_d,
                                                                             umax=umax, umin=umin)
         self.control_solution_time += time.time() - time_0
         for cdx, cluster in self.clusters.items():
@@ -221,7 +226,10 @@ class MultiAgentSystem():
         self._re_eval_system()
         return self.avg_goal_dist, cost_val
 
-    def update_system_mpc_mesocoupling(self, Q, R, P, n_t_mes=8, n_t_mic=2, rad_max=10., lap_lambda=1., umax=None, umin=None):
+    def update_system_mpc_mesocoupling(self, Q, R, P, 
+                                       n_t_mes=8, n_t_mic=2, 
+                                       rad_max=10., lap_lambda=1.,
+                                       umax=None, umin=None):
         """
         Cluster control with coupling MPC algorithm: agent states are corrected
         according to a meso- and micro- scale controllers derived by optimizing 
@@ -278,9 +286,9 @@ class MultiAgentSystem():
         P = np.kron(np.eye(self.n_clusters), P)
         cl_dyn, ag_dyn, u_meso, u_micro, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes,
                                                                                   A_mic, B_mic, n_t_mic, R_mic, x0_mic, lap_mat_aug, lap_lambda,
+                                                                                  x_star_in=goal, coll_d=self.coll_d,
                                                                                   umax_mes=umax, umin_mes=umin,
-                                                                                  umax_mic=umax, umin_mic=umin,
-                                                                                  x_star_in=goal)
+                                                                                  umax_mic=umax, umin_mic=umin,)
         self.control_solution_time += time.time() - time_0
         for cdx, cluster in self.clusters.items():
             #for tdx in range(n_t):

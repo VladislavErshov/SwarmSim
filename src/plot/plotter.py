@@ -7,6 +7,7 @@ import numpy as np
 rename = {
     'n_steps': 'number of max time steps',
     'n_agents': 'number of agents',
+    'mpc_n_t': 'number of time steps in MPC',
     'micro': 'micro-scale strategy',
     'mesocoup': 'proposed hybrid strategy',
     'control_strategy': 'control strategy',

@@ -4,7 +4,7 @@ import src.plot.plotter as pltr
 
 
 if __name__ == '__main__':
-    exper_name = 'exprt_1'
+    exper_name = 'exprt_2'
     results_df = pd.read_csv(f'results/{exper_name}.csv')
     control_strats = tuple(set(results_df['control_strategy']))
     dfs_perstrat = {}

@@ -9,9 +9,9 @@ from cvxpy.atoms.affine.wraps import psd_wrap
 def use_modeling_tool(A, B, N, Q, R, P, x0,
                       umax=None, umin=None, 
                       xmin=None, xmax=None,
-                      x_star_in=None):
+                      x_star_in=None, coll_d=None):
     """
-    Solve a simple conventional MPC problem 
+    Solve a conventional MPC problem with collision avoidance
     """
     (nx, nu) = B.shape
     Q = psd_wrap(Q)
@@ -40,6 +40,10 @@ def use_modeling_tool(A, B, N, Q, R, P, x0,
         if xmax is not None:
             constrlist += [x[:, t] <= xmax[:, 0]]
 
+        if coll_d is not None:
+            for idx in range(nx):
+                constrlist += [cvxpy.norm2(x[:, t] - x[idx, t]) >= coll_d]
+
     costlist += 0.5 * cvxpy.quad_form(x[:, N], P)  # terminal cost
     if xmin is not None:
         constrlist += [x[:, N] >= xmin[:, 0]]
@@ -64,7 +68,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes,
                        A_mic, B_mic, N_mic, R_mic, x0_mic, L=None, L_lambda=1., 
                        umax_mes=None, umin_mes=None, umax_mic=None, umin_mic=None,
                        xmin_mes=None, xmax_mes=None, xmin_mic=None, xmax_mic=None,
-                       x_star_in=None):
+                       x_star_in=None, coll_d=None):
     """
     Solve a meso-micro-scale problem 
     """
@@ -128,12 +132,18 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes,
             if xmax_mic is not None:
                 constrlist += [x_mic[:, t] <= xmax_mic[:, 0]]
 
+            if coll_d is not None:
+                for idx in range(nx_mic):
+                    constrlist += [cvxpy.norm2(x_mic[:, t] - x_mic[idx, t]) >= coll_d]
+
         if umax_mic is not None:
             constrlist += [u_mic <= umax_mic]  # input constraints
         if umin_mic is not None:
             constrlist += [u_mic >= umin_mic]  # input constraints
 
         constrlist += [x_mic[:, 0] == x0_mic]  # inital state constraints    
+
+    
 
     # Solve 
     prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
