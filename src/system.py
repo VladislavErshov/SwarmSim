@@ -52,7 +52,9 @@ class MultiAgentSystem():
         self.clust_algo_params = clust_algo_params
         self.avg_goal_dist = []
         self.cvx_time = 0.
+        self.cvx_time_nocoup = 0.
         self.cvx_ops = 0
+        self.cvx_ops_nocoup = 0
         self.laplacian = None
         self.coll_d = coll_d
         self._re_eval_system()
@@ -150,8 +152,10 @@ class MultiAgentSystem():
             agent.propagate_input(u_dynamics[:, 0])
             self._re_eval_system()
         self.cvx_time += time.time() - time_0
+        self.cvx_time_nocoup = self.cvx_time
         if PYPAPI_SPEC:
             self.cvx_ops += pypapi.high.stop_counters()
+            self.cvx_ops_nocoup = self.cvx_ops
         cost_val /= self.n_agents
         return self.avg_goal_dist, cost_val
 
@@ -194,6 +198,7 @@ class MultiAgentSystem():
                                                                              coll_d=self.coll_d,
                                                                              umax=umax, umin=umin)
         self.cvx_time += time.time() - time_0
+        self.cvx_time_nocoup = self.cvx_time
         if PYPAPI_SPEC:
             self.cvx_ops += pypapi.high.stop_counters()
         for adx, agent in self.agents.items():
@@ -242,6 +247,7 @@ class MultiAgentSystem():
                                                                              coll_d=self.coll_d,
                                                                              umax=umax, umin=umin)
         self.cvx_time += time.time() - time_0
+        self.cvx_time_nocoup = self.cvx_time
         if PYPAPI_SPEC:
             self.cvx_ops += pypapi.high.stop_counters()
         for cdx, cluster in self.clusters.items():
@@ -291,6 +297,8 @@ class MultiAgentSystem():
               adx * self.agent_dim : (adx + 1) * self.agent_dim] = agent.A
             B[adx * self.agent_dim : (adx + 1) * self.agent_dim,
               adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+        for cdx, cluster in self.clusters.items():
+            clust_rads.append(cluster.rad)
         if np.max(clust_rads) > rad_max:
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim))
         else:
@@ -307,9 +315,15 @@ class MultiAgentSystem():
                                                                               lap_mat_aug, lap_lambda,
                                                                               x_star_in=goal, coll_d=self.coll_d,
                                                                               umax=umax, umin=umin,)
-        self.cvx_time += time.time() - time_0
+        time_1 = time.time()
+        self.cvx_time += time_1 - time_0
+        if lap_mat_aug is None:
+            self.cvx_time_nocoup += time_1 - time_0
         if PYPAPI_SPEC:
-            self.cvx_ops += pypapi.high.stop_counters()
+            ops = pypapi.high.stop_counters()
+            self.cvx_ops += ops
+            if lap_mat_aug is None:
+                self.cvx_ops_nocoup += ops
         for cdx, cluster in self.clusters.items():
             #for tdx in range(n_t):
             #    cluster.propagate_input(u_dynacpls[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])
@@ -385,9 +399,15 @@ class MultiAgentSystem():
                                                                                x_star_in=goal, coll_d=self.coll_d,
                                                                                umax_mes=umax, umin_mes=umin,
                                                                                umax_cpl=umax, umin_cpl=umin,)
-        self.cvx_time += time.time() - time_0
+        time_1 = time.time()
+        self.cvx_time += time_1 - time_0
+        if lap_mat_aug is None:
+            self.cvx_time_nocoup += time_1 - time_0
         if PYPAPI_SPEC:
-            self.cvx_ops += pypapi.high.stop_counters()
+            ops = pypapi.high.stop_counters()
+            self.cvx_ops += ops
+            if lap_mat_aug is None:
+                self.cvx_ops_nocoup += ops
         for cdx, cluster in self.clusters.items():
             #for tdx in range(n_t):
             #    cluster.propagate_input(u_dynacpls[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])

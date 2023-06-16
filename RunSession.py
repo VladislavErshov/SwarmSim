@@ -38,7 +38,7 @@ def linear_mpc(
         clust_eps = 1.5, # epsilon-delta clustering parameter epsilon
         agent_dim = 2, # dimensionality of each agent
         control_dim = 2, # diemnsionality of control
-        goal_state = np.array([100, 0]), # goal point coordinates
+        goal_state = np.array([10, 0]), # goal point coordinates
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
         u_bound = None, # control constraint absolute value
@@ -93,11 +93,16 @@ def linear_mpc(
         else:
             raise NotImplementedError(f"Unknown control strategy '{control_strategy}'")
     cvx_time = mas.cvx_time
+    cvx_time_nocoup = mas.cvx_time_nocoup
     cvx_gops = mas.cvx_ops / 10e9
-    #print("Total optimization time (s):", mas.cvx_time)
-    #print("Final cost:", cost_val)
-    #print("Final average goal distance:", avg_goal_dist)
-    return cvx_time, cvx_gops, cost_val, avg_goal_dist
+    cvx_gops_nocoup = mas.cvx_ops_nocoup / 10e9
+    print("Total optimization time (s):", cvx_time)
+    print("Total optimization time w/o coupling (s):", cvx_time_nocoup)
+    print("Total optimization operations (GFLOPs):", cvx_gops)
+    print("Total optimization operations w/o coupling (GFLOPs):", cvx_gops_nocoup)
+    print("Final cost:", cost_val)
+    print("Final average goal distance:", avg_goal_dist)
+    return cvx_time, cvx_time_nocoup, cvx_gops, cvx_gops_nocoup, cost_val, avg_goal_dist
 
 
 if __name__ == '__main__':
@@ -126,8 +131,12 @@ if __name__ == '__main__':
     exprt_keys = exprts[0].keys()
     df_res_dict = {key: [] for key in exprt_keys} | {'cvx_time_MEAN': [],
                                                      'cvx_time_STD': [],
+                                                     'cvx_time_nocoup_MEAN': [],
+                                                     'cvx_time_nocoup_STD': [],
                                                      'cvx_ops_MEAN': [],
                                                      'cvx_ops_STD': [],
+                                                     'cvx_ops_nocoup_MEAN': [],
+                                                     'cvx_ops_nocoup_STD': [],
                                                      'cost_val_MEAN': [],
                                                      'cost_val_STD': [],
                                                      'avg_goal_dist_MEAN': [],
@@ -162,12 +171,16 @@ if __name__ == '__main__':
     
         df_res_dict['cvx_time_MEAN'] = [out_means[0]]
         df_res_dict['cvx_time_STD'] = [(out_stds[0])]
-        df_res_dict['cvx_ops_MEAN'] = [out_means[1]]
-        df_res_dict['cvx_ops_STD'] = [(out_stds[1])]
-        df_res_dict['cost_val_MEAN'] = [(out_means[2])]
-        df_res_dict['cost_val_STD'] = [(out_stds[2])]
-        df_res_dict['avg_goal_dist_MEAN'] = [(out_means[3])]
-        df_res_dict['avg_goal_dist_STD'] = [(out_stds[3])]
+        df_res_dict['cvx_time_nocoup_MEAN'] = [out_means[1]]
+        df_res_dict['cvx_time_nocoup_STD'] = [(out_stds[1])]
+        df_res_dict['cvx_ops_MEAN'] = [out_means[2]]
+        df_res_dict['cvx_ops_STD'] = [(out_stds[2])]
+        df_res_dict['cvx_ops_nocoup_MEAN'] = [out_means[3]]
+        df_res_dict['cvx_ops_nocoup_STD'] = [(out_stds[3])]
+        df_res_dict['cost_val_MEAN'] = [(out_means[4])]
+        df_res_dict['cost_val_STD'] = [(out_stds[4])]
+        df_res_dict['avg_goal_dist_MEAN'] = [(out_means[5])]
+        df_res_dict['avg_goal_dist_STD'] = [(out_stds[5])]
     
         df_res = pd.DataFrame.from_dict(df_res_dict)
         df_res.to_csv(df_res_path, mode='a', header=df_res_header, index=False)
