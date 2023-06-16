@@ -7,17 +7,22 @@ import numpy as np
 rename = {
     'n_steps': 'number of max time steps',
     'n_agents': 'number of agents',
-    'mpc_n_t': 'number of time steps in MPC',
+    'mpc_n_t': 'MPC max horizon',
     'micro': 'micro-scale strategy',
-    'mesocoup': 'proposed hybrid strategy',
+    'microcoup': 'micro-scale strategy with coupling',
+    'mesocoup': 'meso-scale strategy with coupling',
     'control_strategy': 'control strategy',
-    'solution_time': 'solution time',
+    'solution_time': 'solution_time',
+    'cvx_time': 'solution time',
+    'cvx_ops': 'solution FLOPs',
     'cost_val': 'cost value',
     'avg_goal_dist': 'average distance to the goal',
 }
 
 units = {
     'solution_time': 'seconds',
+    'cvx_time': 'seconds',
+    'cvx_ops': 'GFLOPs',
     'cost_val': 'cost',
     'avg_goal_dist': r'$\ell_2$ distance',
 }
