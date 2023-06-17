@@ -96,12 +96,12 @@ def linear_mpc(
     cvx_time_nocoup = mas.cvx_time_nocoup
     cvx_gops = mas.cvx_ops / 10e9
     cvx_gops_nocoup = mas.cvx_ops_nocoup / 10e9
-    print("Total optimization time (s):", cvx_time)
-    print("Total optimization time w/o coupling (s):", cvx_time_nocoup)
-    print("Total optimization operations (GFLOPs):", cvx_gops)
-    print("Total optimization operations w/o coupling (GFLOPs):", cvx_gops_nocoup)
-    print("Final cost:", cost_val)
-    print("Final average goal distance:", avg_goal_dist[-1])
+    #print("Total optimization time (s):", cvx_time)
+    #print("Total optimization time w/o coupling (s):", cvx_time_nocoup)
+    #print("Total optimization operations (GFLOPs):", cvx_gops)
+    #print("Total optimization operations w/o coupling (GFLOPs):", cvx_gops_nocoup)
+    #print("Final cost:", cost_val)
+    #print("Final average goal distance:", avg_goal_dist[-1])
     return cvx_time, cvx_time_nocoup, cvx_gops, cvx_gops_nocoup, cost_val, avg_goal_dist
 
 
@@ -149,8 +149,8 @@ if __name__ == '__main__':
                                                      'avg_goal_dist_MEAN': [],
                                                      'avg_goal_dist_STD': [],}
 
-    print("DYNAMICS RUN")
     if do_dynamics:
+        print("DYNAMICS RUN")
         dyn_exprt_microcoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'microcoup'}
         dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
         print(dyn_exprt_microcoup)
@@ -160,8 +160,8 @@ if __name__ == '__main__':
         df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
         df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
 
-    print("STATISTICS RUN")
     if do_statistics:
+        print("STATISTICS RUN")
         for exprt in exprts:
             print(exprt)
             outs = []
