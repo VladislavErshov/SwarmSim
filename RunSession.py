@@ -118,7 +118,7 @@ if __name__ == '__main__':
     n_exper_runs = metaparams['n_exper_runs']
     do_mp = metaparams['multiprocess']
     do_dynamics = metaparams['do_dynamics']
-    dy_statistics = metaparams['do_statistics']
+    do_statistics = metaparams['do_statistics']
 
     if PYPAPI_SPEC is not None:
         print("OP count enabled")

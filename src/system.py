@@ -327,13 +327,10 @@ class MultiAgentSystem():
             self.cvx_ops += ops
             if lap_mat_aug is None:
                 self.cvx_ops_nocoup += ops
-        for cdx, cluster in self.clusters.items():
+        for adx, agent in self.agents.items():
             #for tdx in range(n_t):
-            #    cluster.propagate_input(u_dynacpls[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])
-            cluster.propagate_input(u_dynamics[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, 0])
-        if lap_mat_aug is not None:
-            for adx, agent in self.agents.items():
-                agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
+            #    agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, tdx])
+            agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
         self._re_eval_system()
         return self.avg_goal_dist, cost_val
 
