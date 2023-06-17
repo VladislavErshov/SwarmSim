@@ -11,10 +11,13 @@ from src.optimizer import mpc_solver
 
 # Find if performance counter module exists
 PYPAPI_SPEC = importlib.util.find_spec('pypapi')
-if PYPAPI_SPEC:
-    pypapi = importlib.util.module_from_spec(PYPAPI_SPEC)
-else:
-    pypapi = None
+if PYPAPI_SPEC is not None:
+    #pypapi = importlib.util.module_from_spec(PYPAPI_SPEC)
+    from pypapi import events as papi_events, papi_high
+    try: 
+        papi_high.start_counters([papi_events.PAPI_FP_OPS,])
+    except:
+        PYPAPI_SPEC = None
 
 
 class MultiAgentSystem():
@@ -133,8 +136,8 @@ class MultiAgentSystem():
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
-        if PYPAPI_SPEC:
-            pypapi.high.start_counters([pypapi.events.PAPI_FP_OPS,])
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
         cost_val = 0.
         for _, agent in self.agents.items():
@@ -153,8 +156,8 @@ class MultiAgentSystem():
             self._re_eval_system()
         self.cvx_time += time.time() - time_0
         self.cvx_time_nocoup = self.cvx_time
-        if PYPAPI_SPEC:
-            self.cvx_ops += pypapi.high.stop_counters()
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            self.cvx_ops += papi_high.stop_counters()
             self.cvx_ops_nocoup = self.cvx_ops
         cost_val /= self.n_agents
         return self.avg_goal_dist, cost_val
@@ -189,8 +192,8 @@ class MultiAgentSystem():
         Q = np.kron(np.eye(self.n_agents), Q)
         R = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_agents), P)
-        if PYPAPI_SPEC:
-            pypapi.high.start_counters([pypapi.events.PAPI_FP_OPS,])
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
         state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t, 
                                                                              Q, R, P, x0, self.agent_dim,
@@ -199,8 +202,8 @@ class MultiAgentSystem():
                                                                              umax=umax, umin=umin)
         self.cvx_time += time.time() - time_0
         self.cvx_time_nocoup = self.cvx_time
-        if PYPAPI_SPEC:
-            self.cvx_ops += pypapi.high.stop_counters()
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            self.cvx_ops += papi_high.stop_counters()
         for adx, agent in self.agents.items():
             #for tdx in range(n_t):
             #    agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, tdx])
@@ -238,8 +241,8 @@ class MultiAgentSystem():
         Q = np.kron(np.eye(self.n_clusters), Q)
         R = np.kron(np.eye(self.n_clusters), R)
         P = np.kron(np.eye(self.n_clusters), P)
-        if PYPAPI_SPEC:
-            pypapi.high.start_counters([pypapi.events.PAPI_FP_OPS,])
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
         state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t, 
                                                                              Q, R, P, x0, self.agent_dim,
@@ -248,8 +251,8 @@ class MultiAgentSystem():
                                                                              umax=umax, umin=umin)
         self.cvx_time += time.time() - time_0
         self.cvx_time_nocoup = self.cvx_time
-        if PYPAPI_SPEC:
-            self.cvx_ops += pypapi.high.stop_counters()
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            self.cvx_ops += papi_high.stop_counters()
         for cdx, cluster in self.clusters.items():
             #for tdx in range(n_t):
             #    cluster.propagate_input(u_dynamics[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])
@@ -308,8 +311,8 @@ class MultiAgentSystem():
         Q = np.kron(np.eye(self.n_agents), Q)
         R = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_agents), P)
-        if PYPAPI_SPEC:
-            pypapi.high.start_counters([pypapi.events.PAPI_FP_OPS,])
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
         state_dynamics, u_dynamics, cost_val = mpc_solver.microcoupling_solve(A, B, n_t_mic, Q, R, P, x0, self.agent_dim, n_t_cpl, 
                                                                               lap_mat_aug, lap_lambda,
@@ -319,8 +322,8 @@ class MultiAgentSystem():
         self.cvx_time += time_1 - time_0
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
-        if PYPAPI_SPEC:
-            ops = pypapi.high.stop_counters()
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            ops = papi_high.stop_counters()
             self.cvx_ops += ops
             if lap_mat_aug is None:
                 self.cvx_ops_nocoup += ops
@@ -391,8 +394,8 @@ class MultiAgentSystem():
         R_mes = np.kron(np.eye(self.n_clusters), R)
         R_cpl = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_clusters), P)
-        if PYPAPI_SPEC:
-            pypapi.high.start_counters([pypapi.events.PAPI_FP_OPS,])
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
         cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes, self.agent_dim,
                                                                                A_cpl, B_cpl, n_t_cpl, R_cpl, x0_cpl, lap_mat_aug, lap_lambda,
@@ -403,8 +406,8 @@ class MultiAgentSystem():
         self.cvx_time += time_1 - time_0
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
-        if PYPAPI_SPEC:
-            ops = pypapi.high.stop_counters()
+        if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
+            ops = papi_high.stop_counters()
             self.cvx_ops += ops
             if lap_mat_aug is None:
                 self.cvx_ops_nocoup += ops

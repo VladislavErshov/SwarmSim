@@ -137,26 +137,26 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
 
 
 def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
-                       A_mic, B_mic, N_mic, R_mic, x0_mic, L=None, L_lambda=1., 
-                       umax_mes=None, umin_mes=None, umax_mic=None, umin_mic=None,
-                       xmin_mes=None, xmax_mes=None, xmin_mic=None, xmax_mic=None,
+                       A_cpl, B_cpl, N_cpl, R_cpl, x0_cpl, L=None, L_lambda=1., 
+                       umax_mes=None, umin_mes=None, umax_cpl=None, umin_cpl=None,
+                       xmin_mes=None, xmax_mes=None, xmin_cpl=None, xmax_cpl=None,
                        x_star_in=None, coll_d=None):
     """
     Solve a meso-scale problem with coupling
     """
     (nx_mes, nu_mes) = B_mes.shape
-    (nx_mic, nu_mic) = B_mic.shape
+    (nx_cpl, nu_cpl) = B_cpl.shape
     
     Q = psd_wrap(Q)
     R_mes = psd_wrap(R_mes)
-    R_mic = psd_wrap(R_mic)
+    R_cpl = psd_wrap(R_cpl)
     P = psd_wrap(P)
 
     # mpc calculation: meso- and micro-scale wariables
     x_mes = cvxpy.Variable((nx_mes, N_mes + 1))
-    x_mic = cvxpy.Variable((nx_mic, N_mic + 1))
+    x_cpl = cvxpy.Variable((nx_cpl, N_cpl + 1))
     u_mes = cvxpy.Variable((nu_mes, N_mes))
-    u_mic = cvxpy.Variable((nu_mic, N_mic))
+    u_cpl = cvxpy.Variable((nu_cpl, N_cpl))
 
     costlist = 0.0
     constrlist = []
@@ -193,34 +193,34 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
     # Fast-time micro-scale problem
     if L is not None:
         L = psd_wrap(L)
-        for t in range(N_mic):
-            costlist += 0.5 * L_lambda * cvxpy.quad_form(x_mic[:, t], L)
-            costlist += 0.5 * cvxpy.quad_form(u_mic[:, t], R_mic)
+        for t in range(N_cpl):
+            costlist += 0.5 * L_lambda * cvxpy.quad_form(x_cpl[:, t], L)
+            costlist += 0.5 * cvxpy.quad_form(u_cpl[:, t], R_cpl)
 
-            constrlist += [x_mic[:, t + 1] == A_mic * x_mic[:, t] + B_mic * u_mic[:, t]]
+            constrlist += [x_cpl[:, t + 1] == A_cpl * x_cpl[:, t] + B_cpl * u_cpl[:, t]]
 
-            if xmin_mic is not None:
-                constrlist += [x_mic[:, t] >= xmin_mic[:, 0]]
-            if xmax_mic is not None:
-                constrlist += [x_mic[:, t] <= xmax_mic[:, 0]]
+            if xmin_cpl is not None:
+                constrlist += [x_cpl[:, t] >= xmin_cpl[:, 0]]
+            if xmax_cpl is not None:
+                constrlist += [x_cpl[:, t] <= xmax_cpl[:, 0]]
 
             # TODO: make convex
             if coll_d is not None:
-                for idx in range(nx_mic//adim):
-                    for jdx in range(idx+1, nx_mic//adim - 1):
-                        constrlist += [cvxpy.norm2(x_mic[idx * adim : (idx+1) * adim, t] - x_mic[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+                for idx in range(nx_cpl//adim):
+                    for jdx in range(idx+1, nx_cpl//adim - 1):
+                        constrlist += [cvxpy.norm2(x_cpl[idx * adim : (idx+1) * adim, t] - x_cpl[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
-        if umax_mic is not None:
-            constrlist += [u_mic <= umax_mic]  # input constraints
-        if umin_mic is not None:
-            constrlist += [u_mic >= umin_mic]  # input constraints
+        if umax_cpl is not None:
+            constrlist += [u_cpl <= umax_cpl]  # input constraints
+        if umin_cpl is not None:
+            constrlist += [u_cpl >= umin_cpl]  # input constraints
 
-        constrlist += [x_mic[:, 0] == x0_mic]  # inital state constraints    
+        constrlist += [x_cpl[:, 0] == x0_cpl]  # inital state constraints    
 
     # Solve 
     prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
     prob.solve(verbose=False)
     cost_val = prob.value
 
-    return x_mes.value, x_mic.value, u_mes.value, u_mic.value, cost_val
+    return x_mes.value, x_cpl.value, u_mes.value, u_cpl.value, cost_val
 

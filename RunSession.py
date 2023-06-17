@@ -6,7 +6,7 @@ import itertools
 import os
 import pandas as pd
 
-from src.system import MultiAgentSystem
+from src.system import MultiAgentSystem, PYPAPI_SPEC
 import src.state_generator as gen
 import src.plot.plotter as pltr
 from src.multiprocessing.mp_wrapper import mp_kwargs_wrapper
@@ -50,7 +50,7 @@ def linear_mpc(
         coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
-        shrink_horizon = True, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
+        shrink_horizon = False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
     ):
     if mpc_n_t2 is None:
         mpc_n_t2 = mpc_n_t
@@ -82,7 +82,7 @@ def linear_mpc(
             avg_goal_dist, cost_val = mas.update_system_mpc_mesoonly(Q, R, P, n_t=mpc_n_t_s, umax=umax, umin=umin)
         elif control_strategy == 'microcoup':
             avg_goal_dist, cost_val = mas.update_system_mpc_microcoupling(Q, R, P, 
-                                                                          n_t_mes=mpc_n_t_s, n_t_cpl=mpc_n_t2_s, 
+                                                                          n_t_mic=mpc_n_t_s, n_t_cpl=mpc_n_t2_s, 
                                                                           rad_max=rad_max, lap_lambda=lap_lambda,
                                                                           umax=umax, umin=umin)
         elif control_strategy == 'mesocoup':
@@ -101,7 +101,7 @@ def linear_mpc(
     print("Total optimization operations (GFLOPs):", cvx_gops)
     print("Total optimization operations w/o coupling (GFLOPs):", cvx_gops_nocoup)
     print("Final cost:", cost_val)
-    print("Final average goal distance:", avg_goal_dist)
+    print("Final average goal distance:", avg_goal_dist[-1])
     return cvx_time, cvx_time_nocoup, cvx_gops, cvx_gops_nocoup, cost_val, avg_goal_dist
 
 
@@ -117,6 +117,13 @@ if __name__ == '__main__':
         metaparams = yaml.load(f, Loader=yaml.FullLoader)
     n_exper_runs = metaparams['n_exper_runs']
     do_mp = metaparams['multiprocess']
+    do_dynamics = metaparams['do_dynamics']
+    dy_statistics = metaparams['do_statistics']
+
+    if PYPAPI_SPEC is not None:
+        print("OP count enabled")
+    else:
+        print("! OP count not available")
 
     # Results initialization
     os.makedirs('results/', exist_ok=True)
@@ -143,48 +150,50 @@ if __name__ == '__main__':
                                                      'avg_goal_dist_STD': [],}
 
     print("DYNAMICS RUN")
-    dyn_exprt_microcoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'microcoup'}
-    dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
-    print(dyn_exprt_microcoup)
-    print(dyn_exprt_mesocoup)
-    _, _, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup)
-    _, _, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup)
-    df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
-    df_dyn.to_csv(df_dyn_path, mode='a', header=True, index=False)
+    if do_dynamics:
+        dyn_exprt_microcoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'microcoup'}
+        dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
+        print(dyn_exprt_microcoup)
+        print(dyn_exprt_mesocoup)
+        _, _, _, _, _, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, plot_dynamics=True)
+        _, _, _, _, _, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, plot_dynamics=True)
+        df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
+        df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
 
     print("STATISTICS RUN")
-    for exprt in exprts:
-        print(exprt)
-        outs = []
-        if do_mp:
-            exprt_list = [exprt for _ in range(n_exper_runs)]
-            outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
-        else:
-            for edx in range(n_exper_runs):
-                task_out = linear_mpc(**exprt)
-                outs.append(task_out)
-        outs = np.array([(*out[:-1], out[-1][-1]) for out in outs])
-        out_means = np.mean(outs, axis=0) 
-        out_stds = np.std(outs, axis=0) 
-        for key in exprt_keys: 
-            df_res_dict[key] = [exprt[key]] 
-    
-        df_res_dict['cvx_time_MEAN'] = [out_means[0]]
-        df_res_dict['cvx_time_STD'] = [(out_stds[0])]
-        df_res_dict['cvx_time_nocoup_MEAN'] = [out_means[1]]
-        df_res_dict['cvx_time_nocoup_STD'] = [(out_stds[1])]
-        df_res_dict['cvx_ops_MEAN'] = [out_means[2]]
-        df_res_dict['cvx_ops_STD'] = [(out_stds[2])]
-        df_res_dict['cvx_ops_nocoup_MEAN'] = [out_means[3]]
-        df_res_dict['cvx_ops_nocoup_STD'] = [(out_stds[3])]
-        df_res_dict['cost_val_MEAN'] = [(out_means[4])]
-        df_res_dict['cost_val_STD'] = [(out_stds[4])]
-        df_res_dict['avg_goal_dist_MEAN'] = [(out_means[5])]
-        df_res_dict['avg_goal_dist_STD'] = [(out_stds[5])]
-    
-        df_res = pd.DataFrame.from_dict(df_res_dict)
-        df_res.to_csv(df_res_path, mode='a', header=df_res_header, index=False)
-        df_res_header = False
-    
-
+    if do_statistics:
+        for exprt in exprts:
+            print(exprt)
+            outs = []
+            if do_mp:
+                exprt_list = [exprt for _ in range(n_exper_runs)]
+                outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
+            else:
+                for edx in range(n_exper_runs):
+                    task_out = linear_mpc(**exprt)
+                    outs.append(task_out)
+            outs = np.array([(*out[:-1], out[-1][-1]) for out in outs])
+            out_means = np.mean(outs, axis=0) 
+            out_stds = np.std(outs, axis=0) 
+            for key in exprt_keys: 
+                df_res_dict[key] = [exprt[key]] 
         
+            df_res_dict['cvx_time_MEAN'] = [out_means[0]]
+            df_res_dict['cvx_time_STD'] = [(out_stds[0])]
+            df_res_dict['cvx_time_nocoup_MEAN'] = [out_means[1]]
+            df_res_dict['cvx_time_nocoup_STD'] = [(out_stds[1])]
+            df_res_dict['cvx_ops_MEAN'] = [out_means[2]]
+            df_res_dict['cvx_ops_STD'] = [(out_stds[2])]
+            df_res_dict['cvx_ops_nocoup_MEAN'] = [out_means[3]]
+            df_res_dict['cvx_ops_nocoup_STD'] = [(out_stds[3])]
+            df_res_dict['cost_val_MEAN'] = [(out_means[4])]
+            df_res_dict['cost_val_STD'] = [(out_stds[4])]
+            df_res_dict['avg_goal_dist_MEAN'] = [(out_means[5])]
+            df_res_dict['avg_goal_dist_STD'] = [(out_stds[5])]
+        
+            df_res = pd.DataFrame.from_dict(df_res_dict)
+            df_res.to_csv(df_res_path, mode='a', header=df_res_header, index=False)
+            df_res_header = False
+        
+
+            
