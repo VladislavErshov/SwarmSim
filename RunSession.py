@@ -41,16 +41,16 @@ def linear_mpc(
         goal_state = np.array([10, 0]), # goal point coordinates
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
-        u_bound = None, # control constraint absolute value
+        u_bound = 1, # control constraint absolute value
         n_steps = 16, # number of MPC iterations
         mpc_n_t = 16, # MPC horizon
         mpc_n_t2 = None, # MPC horizon for the coupling term
         rad_max = 2., # target maximum cluster radius 
         lap_lambda = 1., # coupling weight
-        coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
+        coll_d = 0.1, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
-        shrink_horizon = False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
+        shrink_horizon = True, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
     ):
     if mpc_n_t2 is None:
         mpc_n_t2 = mpc_n_t
