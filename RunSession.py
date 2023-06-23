@@ -16,7 +16,6 @@ from src.multiprocessing.mp_wrapper import mp_kwargs_wrapper
 with open('cfg/seed.yaml') as f:
     seed_data = yaml.load(f, Loader=yaml.FullLoader)
     rnd_seed = seed_data['RND_SEED']
-    #np.random.seed(rnd_seed)
 
 warnings.filterwarnings('ignore')
 
@@ -42,18 +41,20 @@ def linear_mpc(
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
         u_bound = None, # control constraint absolute value
-        n_steps = 16, # number of MPC iterations
+        n_steps = None, # number of MPC iterations
         mpc_n_t = 16, # MPC horizon
-        mpc_n_t2 = 3, # MPC horizon for the coupling term
+        mpc_n_t2 = 2, # MPC horizon for the coupling term
         rad_max = 2., # target maximum cluster radius 
         lap_lambda = 1., # coupling weight
         coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
-        shrink_horizon = True, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
+        shrink_horizon = False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
     ):
     if mpc_n_t2 is None:
         mpc_n_t2 = mpc_n_t
+    if n_steps is None:
+        n_steps = mpc_n_t
     Q = np.eye(agent_dim)
     R = np.eye(control_dim)
     P = np.eye(agent_dim)#np.zeros((agent_dim, agent_dim))
@@ -157,7 +158,9 @@ if __name__ == '__main__':
         dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
         print(dyn_exprt_microcoup)
         print(dyn_exprt_mesocoup)
+        np.random.seed(rnd_seed)
         _, _, _, _, _, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, plot_dynamics=True)
+        np.random.seed(rnd_seed)
         _, _, _, _, _, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, plot_dynamics=True)
         df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
         df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
@@ -167,6 +170,7 @@ if __name__ == '__main__':
         for exprt in exprts:
             print(exprt)
             outs = []
+            np.random.seed(rnd_seed)
             if do_mp:
                 exprt_list = [exprt for _ in range(n_exper_runs)]
                 outs = mp_kwargs_wrapper(linear_mpc, exprt_list)

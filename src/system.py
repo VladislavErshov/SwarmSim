@@ -60,6 +60,7 @@ class MultiAgentSystem():
         self.cvx_ops_nocoup = 0
         self.laplacian = None
         self.coll_d = coll_d
+        self.do_coupling = True
         self._re_eval_system()
 
     def _re_eval_system(self):
@@ -266,7 +267,8 @@ class MultiAgentSystem():
     def update_system_mpc_microcoupling(self, Q, R, P, 
                                         n_t_mic=8, n_t_cpl=None, 
                                         rad_max=10., lap_lambda=1.,
-                                        umax=None, umin=None):
+                                        umax=None, umin=None,
+                                        turn_cpl_off=True):
         """
         Micro-scale control with coupling MPC algorithm: agent states are corrected
         according to a micro-scale controller derived by optimizing 
@@ -288,6 +290,7 @@ class MultiAgentSystem():
             rad_max:        Target maximum cluster radius, used to activate coupling
             lap_lambda:     Coupling weight in the cost functional
             umax, umin:     Control value constraints
+            turn_cpl_off:   Turn coupling off forever when clusters with a desired rad_max achieved
         
         Returns:
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
@@ -305,10 +308,12 @@ class MultiAgentSystem():
               adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
         for cdx, cluster in self.clusters.items():
             clust_rads.append(cluster.rad)
-        if np.max(clust_rads) > rad_max:
+        if (np.max(clust_rads) > rad_max) and (self.do_coupling):
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim))
         else:
             lap_mat_aug = None
+            if turn_cpl_off:
+                self.do_coupling = False
         x0 = self.agent_states.flatten()
         goal = np.kron(np.ones((self.n_agents)), self.system_goal)
         Q = np.kron(np.eye(self.n_agents), Q)
@@ -340,7 +345,8 @@ class MultiAgentSystem():
     def update_system_mpc_mesocoupling(self, Q, R, P, 
                                        n_t_mes=8, n_t_cpl=2, 
                                        rad_max=10., lap_lambda=1.,
-                                       umax=None, umin=None):
+                                       umax=None, umin=None,
+                                       turn_cpl_off=True):
         """
         Cluster control with coupling MPC algorithm: agent states are corrected
         according to a meso- and micro- scale controllers derived by optimizing 
@@ -362,6 +368,7 @@ class MultiAgentSystem():
             rad_max:        Target maximum cluster radius, used to activate coupling
             lap_lambda:     Coupling weight in the cost functional
             umax, umin:     Control value constraints
+            turn_cpl_off:   Turn coupling off forever when clusters with a desired rad_max achieved
         
         Returns:
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
@@ -383,10 +390,12 @@ class MultiAgentSystem():
                   adx * self.agent_dim : (adx + 1) * self.agent_dim] = agent.A
             B_cpl[adx * self.agent_dim : (adx + 1) * self.agent_dim,
                   adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
-        if np.max(clust_rads) > rad_max:
+        if (np.max(clust_rads) > rad_max) and (self.do_coupling):
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim))
         else:
             lap_mat_aug = None
+            if turn_cpl_off:
+                self.do_coupling = False
         x0_mes = self.cluster_states.flatten()
         x0_cpl = self.agent_states.flatten()
         goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
