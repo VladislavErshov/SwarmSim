@@ -33,7 +33,7 @@ args = parser.parse_args()
 def linear_mpc(
         n_agents = 1000, # number of agents
         cluster_means = [(0, 5), (0, -5)], # coordinates of initial cluster centroids for each cluster
-        cluster_std = 1, # standard deviation for gaussian blob cluster initialization
+        cluster_std = 0.8, # standard deviation for gaussian blob cluster initialization
         clust_eps = 1.5, # epsilon-delta clustering parameter epsilon
         agent_dim = 2, # dimensionality of each agent
         control_dim = 2, # diemnsionality of control
@@ -48,7 +48,7 @@ def linear_mpc(
         lap_lambda = 1., # coupling weight
         coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
-        plot_dynamics = False, # 'True' if draw system dynamics step-by-step
+        dynamics_pic_dir = None, # None if prefer not to save dynamics plots, path to the save directory otherwise 
         shrink_horizon = False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
     ):
     if mpc_n_t2 is None:
@@ -59,7 +59,7 @@ def linear_mpc(
     R = np.eye(control_dim)
     P = np.eye(agent_dim)#np.zeros((agent_dim, agent_dim))
     if u_bound is None:
-        u_bound = np.linalg.norm(goal_state, 2) / mpc_n_t
+        u_bound = 2 * np.linalg.norm(goal_state, 2) / mpc_n_t
     umax = u_bound
     umin = -u_bound 
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
@@ -75,8 +75,8 @@ def linear_mpc(
         else:
             mpc_n_t_s = mpc_n_t
             mpc_n_t2_s = mpc_n_t2
-        if plot_dynamics:
-            pltr.system_state(mas, goal_state, avg_goal_dist, cost_val)
+        if dynamics_pic_dir is not None:
+            pltr.system_state(mas, goal_state, avg_goal_dist, cost_val, save_path=dynamics_pic_dir + control_strategy + f'_{sdx}.png')
         if control_strategy == 'micro':
             avg_goal_dist, cost_val = mas.update_system_mpc(Q, R, P, n_t=mpc_n_t_s, umax=umax, umin=umin)
         elif control_strategy == 'microdist':
@@ -129,9 +129,11 @@ if __name__ == '__main__':
         print("! OP count not available")
 
     # Results initialization
-    os.makedirs('results/', exist_ok=True)
-    df_res_path = f'results/{config_name}.csv'
-    df_dyn_path = f'results/{config_name}_dyn.csv'
+    res_dir = f'results/{config_name}/'
+    os.makedirs(res_dir, exist_ok=True)
+    df_res_path = res_dir + 'statistics.csv'
+    df_dyn_path = res_dir + 'dynamics.csv'
+    df_cost_path = res_dir + 'costs.csv'
 
     if os.path.exists(df_res_path):
         df_res_header = False
@@ -159,11 +161,13 @@ if __name__ == '__main__':
         print(dyn_exprt_microcoup)
         print(dyn_exprt_mesocoup)
         np.random.seed(rnd_seed)
-        _, _, _, _, _, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, plot_dynamics=True)
+        _, _, _, _, cost_microcoup, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, dynamics_pic_dir=res_dir)
         np.random.seed(rnd_seed)
-        _, _, _, _, _, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, plot_dynamics=True)
+        _, _, _, _, cost_mesocoup, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, dynamics_pic_dir=res_dir)
         df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
         df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
+        df_cost = pd.DataFrame.from_dict({'microcoup': cost_microcoup, 'mesocoup': cost_mesocoup})
+        df_cost.to_csv(df_cost_path, mode='w', header=True, index=False)
 
     if do_statistics:
         print("STATISTICS RUN")

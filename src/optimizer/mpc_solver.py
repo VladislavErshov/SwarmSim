@@ -94,7 +94,7 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
             costlist += 0.5 * cvxpy.quad_form(x[:, t] - x_star, Q)
         else:
             costlist += 0.5 * cvxpy.quad_form(x[:, t], Q)
-        costlist += 0.5 * cvxpy.quad_form(u[:, t], R)
+        #costlist += 0.5 * cvxpy.quad_form(u[:, t], R)
 
         constrlist += [x[:, t + 1] == A * x[:, t] + B * u[:, t]]
 
@@ -195,7 +195,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
         L = psd_wrap(L)
         for t in range(N_cpl):
             costlist += 0.5 * L_lambda * cvxpy.quad_form(x_cpl[:, t], L)
-            costlist += 0.5 * cvxpy.quad_form(u_cpl[:, t], R_cpl)
+            #costlist += 0.5 * cvxpy.quad_form(u_cpl[:, t], R_cpl)
 
             constrlist += [x_cpl[:, t + 1] == A_cpl * x_cpl[:, t] + B_cpl * u_cpl[:, t]]
 

@@ -61,49 +61,56 @@ class MultiAgentSystem():
         self.laplacian = None
         self.coll_d = coll_d
         self.do_coupling = True
+        self.clusters = {}
         self._re_eval_system()
 
-    def _re_eval_system(self):
+    def _re_eval_system(self, re_compute_clusters=True):
         """Re-evaluate full system state by gathering each agent states"""
         for idx, agent in self.agents.items():
             self.agent_states[idx] = agent.state
         self.avg_goal_dist.append(np.linalg.norm(self.agent_states - self.system_goal, axis=1).mean(axis=0))
-        self._re_eval_clusters()
+        self._re_eval_clusters(re_compute_clusters)
 
-    def _re_eval_clusters(self):
+    def _re_eval_clusters(self, re_compute_clusters=True):
         """Re-evaluate clusters"""
-        algo = self.clust_algo
-        algo_parameters = self.clust_algo_params
-        if algo == 'epsdel':
-            epsv, delv = algo_parameters
-            self.clust_labels, _, _, lap_mat = epsdel_clustering(self.agent_states, epsv, delv)
-            self.laplacian = lap_mat
-        elif algo == 'hdbscan':
-            # TODO adjacency and Laplacian matrices
-            raise NotImplementedError("Sorry! The method is not functioning at the moment. Plaese, use 'epsdel' method.")
-            alpha, leaf_size, min_cluster_size = algo_parameters
-            clusterer = hdbscan.HDBSCAN(alpha=alpha, 
-                                        leaf_size=leaf_size, 
-                                        min_cluster_size=min_cluster_size,
-                                        min_samples=1)
-            clusterer.fit(self.agent_states)
-            self.clust_labels = clusterer.labels_
+        if re_compute_clusters:
+            algo = self.clust_algo
+            algo_parameters = self.clust_algo_params
+            if algo == 'epsdel':
+                epsv, delv = algo_parameters
+                self.clust_labels, _, _, lap_mat = epsdel_clustering(self.agent_states, epsv, delv)
+                self.laplacian = lap_mat
+            elif algo == 'hdbscan':
+                # TODO adjacency and Laplacian matrices
+                raise NotImplementedError("Sorry! The method is not functioning at the moment. Plaese, use 'epsdel' method.")
+                alpha, leaf_size, min_cluster_size = algo_parameters
+                clusterer = hdbscan.HDBSCAN(alpha=alpha, 
+                                            leaf_size=leaf_size, 
+                                            min_cluster_size=min_cluster_size,
+                                            min_samples=1)
+                clusterer.fit(self.agent_states)
+                self.clust_labels = clusterer.labels_
+            else:
+                raise ValueError("Cluster identification algorithm not implemented. Plaese, use 'hierarchy' method.")
+            
+            self.n_clusters = max(self.clust_labels) + 1
+            self.clusters = {}
+            self.cluster_n_agents = np.zeros((self.n_clusters))
+            self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
+            for cdx in range(self.n_clusters):
+                agent_indices = np.where(self.clust_labels == cdx)[0]
+                n_agents_clust = agent_indices.size
+                cluster = LinearClusterNd({loc_idx : self.agents[loc_idx] for loc_idx in agent_indices},
+                                          n_agents_clust,
+                                          self.agent_dim)
+                self.clusters[cdx] = cluster 
+                self.cluster_n_agents[cdx] = n_agents_clust
+                self.cluster_states[cdx] = cluster.state
         else:
-            raise ValueError("Cluster identification algorithm not implemented. Plaese, use 'hierarchy' method.")
-        
-        self.n_clusters = max(self.clust_labels) + 1
-        self.clusters = {}
-        self.cluster_n_agents = np.zeros((self.n_clusters))
-        self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
-        for cdx in range(self.n_clusters):
-            agent_indices = np.where(self.clust_labels == cdx)[0]
-            n_agents_clust = agent_indices.size
-            cluster = LinearClusterNd({loc_idx : self.agents[loc_idx] for loc_idx in agent_indices},
-                                      n_agents_clust,
-                                      self.agent_dim)
-            self.clusters[cdx] = cluster 
-            self.cluster_n_agents[cdx] = n_agents_clust
-            self.cluster_states[cdx] = cluster.state
+            self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
+            for cdx, cluster in self.clusters.items():
+                cluster.update_state()
+                self.cluster_states[cdx] = cluster.state
     
     # Non-correct simplified implementation
     def update_system_descent(self, step_size=0.01):
@@ -405,7 +412,7 @@ class MultiAgentSystem():
         R_mes = np.kron(calpha_diag, R)
         #R_mes = np.kron(np.eye(self.n_clusters), R)
         R_cpl = np.kron(np.eye(self.n_agents), R)
-        P = np.kron(np.eye(self.n_clusters), P)
+        P = np.kron(calpha_diag, P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
@@ -430,7 +437,7 @@ class MultiAgentSystem():
         if lap_mat_aug is not None:
             for adx, agent in self.agents.items():
                 agent.propagate_input(u_cpl[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
-        self._re_eval_system()
+        self._re_eval_system(self.do_coupling)
         return self.avg_goal_dist, cost_val
 
 
@@ -483,7 +490,7 @@ class LinearClusterNd():
         assert n_agents == len(agents)
         self.n_agents = n_agents
         self.agent_states = np.zeros((n_agents, agent_dim))
-        self.state, self.rad = self.update_state()
+        self.update_state()
         self.A = 0.
         self.B = 0.
         for agent in self.agents.values():
@@ -502,7 +509,7 @@ class LinearClusterNd():
         """Update the centroid value according to the aggregated agent state."""
         for idx in range(self.n_agents):
             self.agent_states[idx] = list(self.agents.values())[idx].state
-        state = np.mean(self.agent_states, axis=0)
-        rad = np.linalg.norm(self.agent_states - state, axis=1).max(axis=0)
-        return state, rad
+        self.state = np.mean(self.agent_states, axis=0)
+        self.rad = np.linalg.norm(self.agent_states - self.state, axis=1).max(axis=0)
+        return self.state, self.rad
 

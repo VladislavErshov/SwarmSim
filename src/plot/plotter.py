@@ -28,7 +28,7 @@ units = {
 }
 
 
-def system_state(mas, goal_state, avg_goal_dist, cost_val):
+def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path=None):
     """
     Plot system state.
 
@@ -54,7 +54,10 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val):
     ax.set_title(f"Avg goal dist: {avg_goal_dist[-1]:.2}; cost: {cost_val:.2f}")
     ax.set_xlim(-5, goal_state[0] * 1.2)
     ax.set_ylim(-10, 10)
-    plt.show() 
+    if show:
+        plt.show() 
+    if save_path is not None:
+        plt.savefig(save_path)
 
 
 def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols):
