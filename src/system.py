@@ -92,6 +92,7 @@ class MultiAgentSystem():
         
         self.n_clusters = max(self.clust_labels) + 1
         self.clusters = {}
+        self.cluster_n_agents = np.zeros((self.n_clusters))
         self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
         for cdx in range(self.n_clusters):
             agent_indices = np.where(self.clust_labels == cdx)[0]
@@ -100,6 +101,7 @@ class MultiAgentSystem():
                                       n_agents_clust,
                                       self.agent_dim)
             self.clusters[cdx] = cluster 
+            self.cluster_n_agents[cdx] = n_agents_clust
             self.cluster_states[cdx] = cluster.state
     
     # Non-correct simplified implementation
@@ -238,9 +240,10 @@ class MultiAgentSystem():
               cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
         x0 = self.cluster_states.flatten()
         goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
-        Q = np.kron(np.eye(self.n_clusters), Q)
-        R = np.kron(np.eye(self.n_clusters), R)
-        P = np.kron(np.eye(self.n_clusters), P)
+        calpha_diag = np.diag(self.cluster_n_agents)
+        Q = np.kron(calpha_diag, Q)
+        R = np.kron(calpha_diag, R)
+        P = np.kron(calpha_diag, P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
@@ -387,8 +390,11 @@ class MultiAgentSystem():
         x0_mes = self.cluster_states.flatten()
         x0_cpl = self.agent_states.flatten()
         goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
-        Q = np.kron(np.eye(self.n_clusters), Q)
-        R_mes = np.kron(np.eye(self.n_clusters), R)
+        calpha_diag = np.diag(self.cluster_n_agents)
+        Q = np.kron(calpha_diag, Q)
+        #Q = np.kron(np.eye(self.n_clusters), Q)
+        R_mes = np.kron(calpha_diag, R)
+        #R_mes = np.kron(np.eye(self.n_clusters), R)
         R_cpl = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_clusters), P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:

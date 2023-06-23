@@ -41,13 +41,13 @@ def linear_mpc(
         goal_state = np.array([10, 0]), # goal point coordinates
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
-        u_bound = 1, # control constraint absolute value
+        u_bound = None, # control constraint absolute value
         n_steps = 16, # number of MPC iterations
         mpc_n_t = 16, # MPC horizon
-        mpc_n_t2 = None, # MPC horizon for the coupling term
+        mpc_n_t2 = 3, # MPC horizon for the coupling term
         rad_max = 2., # target maximum cluster radius 
         lap_lambda = 1., # coupling weight
-        coll_d = 0.1, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
+        coll_d = None, # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
         control_strategy = 'mesocoup', # control strategy
         plot_dynamics = False, # 'True' if draw system dynamics step-by-step
         shrink_horizon = True, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
@@ -57,8 +57,10 @@ def linear_mpc(
     Q = np.eye(agent_dim)
     R = np.eye(control_dim)
     P = np.eye(agent_dim)#np.zeros((agent_dim, agent_dim))
+    if u_bound is None:
+        u_bound = np.linalg.norm(goal_state, 2) / mpc_n_t
     umax = u_bound
-    umin = -u_bound if u_bound is not None else None
+    umin = -u_bound 
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
                            state_gen=gen.random_blobs, 
                            state_gen_args=[[A], [B], cluster_means, cluster_std],

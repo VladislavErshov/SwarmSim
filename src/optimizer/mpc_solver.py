@@ -44,7 +44,7 @@ def conventional_solve(A, B, N, Q, R, P, x0, adim,
         if coll_d is not None:
             for idx in range(nx//adim):
                 for jdx in range(idx+1, nx//adim):
-                    constrlist += [cvxpy.norm2(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+                    constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
     costlist += 0.5 * cvxpy.quad_form(x[:, N], P)  # terminal cost
     if xmin is not None:
@@ -107,7 +107,7 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
         if coll_d is not None:
             for idx in range(nx//adim):
                 for jdx in range(idx+1, nx//adim - 1):
-                    constrlist += [cvxpy.norm2(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+                    constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
     costlist += 0.5 * cvxpy.quad_form(x[:, N_mic], P)  # terminal cost
     if xmin is not None:
@@ -208,7 +208,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
             if coll_d is not None:
                 for idx in range(nx_cpl//adim):
                     for jdx in range(idx+1, nx_cpl//adim - 1):
-                        constrlist += [cvxpy.norm2(x_cpl[idx * adim : (idx+1) * adim, t] - x_cpl[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+                        constrlist += [cvxpy.norm1(x_cpl[idx * adim : (idx+1) * adim, t] - x_cpl[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
         if umax_cpl is not None:
             constrlist += [u_cpl <= umax_cpl]  # input constraints
