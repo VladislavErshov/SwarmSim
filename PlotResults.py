@@ -27,4 +27,4 @@ if __name__ == '__main__':
         for ri_col in rest_param_cols:
             for strat, df in dfs_perstrat.items():
                 dfs_currparam[strat] = df[df[ri_col] == unique_param_vals[ri_col][-1]][data_cols]#.drop([ri_col], axis=1)
-        pltr.exprt_results(dfs_currparam, param_col, unique_param_vals[param_col], mean_cols, std_cols, xscale, xbase)
+        pltr.exprt_results(dfs_currparam, param_col, unique_param_vals[param_col], mean_cols, std_cols, xscale, xbase, save_dir=f'results/{exper_name}/')

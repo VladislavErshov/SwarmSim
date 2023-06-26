@@ -10,8 +10,8 @@ rename = {
     'n_agents': 'number of agents',
     'mpc_n_t': 'MPC max horizon',
     'micro': 'micro-scale strategy',
-    'microcoup': 'micro-scale strategy with coupling',
-    'mesocoup': 'meso-scale strategy with coupling',
+    'microcoup': 'micro-scale strategy',
+    'mesocoup': 'meso-scale strategy',
     'control_strategy': 'control strategy',
     'solution_time': 'solution_time',
     'cvx_time': 'solution time',
@@ -69,7 +69,7 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         plt.savefig(save_path)
 
 
-def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', xbase=10):
+def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', xbase=10, save_dir=None):
     colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
@@ -80,10 +80,13 @@ def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale=
                         label=rename[strat])
             ax.grid('major')
             ax.set_xscale(xscale, base=xbase)
+            ax.set_yscale(xscale)
             ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
             ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
             ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
             ax.set_ylabel(f'value, {units[data_name]}')
             ax.set_xlabel(rename[param_col])
             ax.legend()
-        plt.show()
+        #plt.show()
+        if save_dir is not None:
+            plt.savefig(save_dir + f'{data_name}_{param_col}.png')
