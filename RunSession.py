@@ -36,6 +36,8 @@ if len(sys.argv) == 1:
 else:
     configs = sys.argv[1:]
 
+translation_table = str.maketrans('', '', ''.join(["'", ":", "{", "}", ","]))
+
 # Initialize obstacles [TODO]
 
 def linear_mpc(
@@ -178,11 +180,13 @@ if __name__ == '__main__':
 
         for exprt in exprts:
             print(exprt)
+            e_str = str(exort)
+            e_str = e_str.translate(translation_table).replace(' ', '_')
             outs = []
             np.random.seed(rnd_seed)
             
             if do_dynamics:
-                df_dyn_dir = res_dir + f'{exprt}/'
+                df_dyn_dir = res_dir + f'{e_str}/'
                 os.makedirs(df_dyn_dir, exist_ok=True)
             else:
                 df_dyn_dir = None
