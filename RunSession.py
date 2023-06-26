@@ -69,7 +69,7 @@ def linear_mpc(
     R = np.eye(control_dim) / n_agents
     P = np.eye(agent_dim) / n_agents #np.zeros((agent_dim, agent_dim))
     if u_bound is None:
-        u_bound = 1.2 * np.linalg.norm(goal_state, 2) / mpc_n_t
+        u_bound = 2 * np.linalg.norm(goal_state, 2) / mpc_n_t
     umax = u_bound
     umin = -u_bound 
     umax_cpl = 1
