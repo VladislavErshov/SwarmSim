@@ -69,7 +69,7 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         plt.savefig(save_path)
 
 
-def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', xbase=10, save_dir=None):
+def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', save_dir=None):
     colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
@@ -79,7 +79,7 @@ def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale=
                         c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
                         label=rename[strat])
             ax.grid('major')
-            ax.set_xscale(xscale, base=xbase)
+            ax.set_xscale(xscale)
             ax.set_yscale(xscale)
             ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
             ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())

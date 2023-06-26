@@ -46,7 +46,10 @@ def conventional_solve(A, B, N, Q, R, P, x0, adim,
                 for jdx in range(idx+1, nx//adim):
                     constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
-    costlist += 0.5 * cvxpy.quad_form(x[:, N], P)  # terminal cost
+    if x_star_in is not None:
+        costlist += 0.5 * cvxpy.quad_form(x[:, N] - x_star, P)  # terminal cost
+    else:
+        costlist += 0.5 * cvxpy.quad_form(x[:, N], P)
     if xmin is not None:
         constrlist += [x[:, N] >= xmin[:, 0]]
     if xmax is not None:
@@ -109,7 +112,10 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
                 for jdx in range(idx+1, nx//adim - 1):
                     constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
-    costlist += 0.5 * cvxpy.quad_form(x[:, N_mic], P)  # terminal cost
+    if x_star_in is not None:
+        costlist += 0.5 * cvxpy.quad_form(x[:, N_mic] - x_star, P)  # terminal cost
+    else:
+        costlist += 0.5 * cvxpy.quad_form(x[:, N_mic], P)
     if xmin is not None:
         constrlist += [x[:, N_mic] >= xmin[:, 0]]
     if xmax is not None:
@@ -136,8 +142,8 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
     return x.value, u.value, cost_val
 
 
-def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
-                       A_cpl, B_cpl, N_cpl, R_cpl, x0_cpl, L=None, L_lambda=1., 
+def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R, P, x0_mes, adim,
+                       A_cpl, B_cpl, N_cpl, x0_cpl, L=None, L_lambda=1., 
                        umax_mes=None, umin_mes=None, umax_cpl=None, umin_cpl=None,
                        xmin_mes=None, xmax_mes=None, xmin_cpl=None, xmax_cpl=None,
                        x_star_in=None, coll_d=None):
@@ -148,8 +154,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
     (nx_cpl, nu_cpl) = B_cpl.shape
     
     Q = psd_wrap(Q)
-    R_mes = psd_wrap(R_mes)
-    R_cpl = psd_wrap(R_cpl)
+    R = psd_wrap(R)
     P = psd_wrap(P)
 
     # mpc calculation: meso- and micro-scale wariables
@@ -168,7 +173,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
             costlist += 0.5 * cvxpy.quad_form(x_mes[:, t] - x_star, Q)
         else:
             costlist += 0.5 * cvxpy.quad_form(x_mes[:, t], Q)
-        costlist += 0.5 * cvxpy.quad_form(u_mes[:, t], R_mes)
+        costlist += 0.5 * cvxpy.quad_form(u_mes[:, t], R)
 
         constrlist += [x_mes[:, t + 1] == A_mes * x_mes[:, t] + B_mes * u_mes[:, t]]
 
@@ -177,7 +182,10 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
         if xmax_mes is not None:
             constrlist += [x_mes[:, t] <= xmax_mes[:, 0]]
 
-    costlist += 0.5 * cvxpy.quad_form(x_mes[:, N_mes], P)  # terminal cost
+    if x_star_in is not None:
+        costlist += 0.5 * cvxpy.quad_form(x_mes[:, N_mes] - x_star, P)  # terminal cost
+    else:
+        costlist += 0.5 * cvxpy.quad_form(x_mes[:, N_mes], P) 
     if xmin_mes is not None:
         constrlist += [x_mes[:, N_mes] >= xmin_mes[:, 0]]
     if xmax_mes is not None:
@@ -195,7 +203,6 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R_mes, P, x0_mes, adim,
         L = psd_wrap(L)
         for t in range(N_cpl):
             costlist += 0.5 * L_lambda * cvxpy.quad_form(x_cpl[:, t], L)
-            #costlist += 0.5 * cvxpy.quad_form(u_cpl[:, t], R_cpl)
 
             constrlist += [x_cpl[:, t + 1] == A_cpl * x_cpl[:, t] + B_cpl * u_cpl[:, t]]
 

@@ -69,9 +69,11 @@ def linear_mpc(
     R = np.eye(control_dim) / n_agents
     P = np.eye(agent_dim) / n_agents #np.zeros((agent_dim, agent_dim))
     if u_bound is None:
-        u_bound = 2 * np.linalg.norm(goal_state, 2) / mpc_n_t
+        u_bound = 1.2 * np.linalg.norm(goal_state, 2) / mpc_n_t
     umax = u_bound
     umin = -u_bound 
+    umax_cpl = 1
+    umin_cpl = -1
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
                            state_gen=gen.random_blobs, 
                            state_gen_args=[[A], [B], cluster_means, cluster_std],
@@ -102,7 +104,8 @@ def linear_mpc(
             avg_goal_dist, cost_val = mas.update_system_mpc_mesocoupling(Q, R, P, 
                                                                          n_t_mes=mpc_n_t_s, n_t_cpl=mpc_n_t2_s, 
                                                                          rad_max=rad_max, lap_lambda=lap_lambda,
-                                                                         umax=umax, umin=umin)
+                                                                         umax_mes=umax, umin_mes=umin,
+                                                                         umax_cpl=umax_cpl, umin_cpl=umin_cpl)
         else:
             raise NotImplementedError(f"Unknown control strategy '{control_strategy}'")
         cost_vals.append(cost_val)
@@ -180,7 +183,7 @@ if __name__ == '__main__':
 
         for exprt in exprts:
             print(exprt)
-            e_str = str(exort)
+            e_str = str(exprt)
             e_str = e_str.translate(translation_table).replace(' ', '_')
             outs = []
             np.random.seed(rnd_seed)

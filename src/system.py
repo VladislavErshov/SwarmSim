@@ -352,7 +352,8 @@ class MultiAgentSystem():
     def update_system_mpc_mesocoupling(self, Q, R, P, 
                                        n_t_mes=8, n_t_cpl=2, 
                                        rad_max=10., lap_lambda=1.,
-                                       umax=None, umin=None,
+                                       umax_mes=None, umin_mes=None,
+                                       umax_cpl=None, umin_cpl=None,
                                        turn_cpl_off=True):
         """
         Cluster control with coupling MPC algorithm: agent states are corrected
@@ -367,15 +368,16 @@ class MultiAgentSystem():
             +   Sum^N_cpl (x_cpl^T L x_cpl + u_cpl^T R_cpl u_cpl)
 
         Args:
-            Q:              State-cost weight matrix (for a single cluster)
-            R:              Control-cost weight matrix (for a single agent and cluster, prefer R = Identity)
-            P:              Terminal-state-cost weight matrix (for a single agent)
-            n_t_mes:        Number of time steps in the meso-scale part of MPC
-            n_t_cpl:        Number of time steps in the coupling part of MPC
-            rad_max:        Target maximum cluster radius, used to activate coupling
-            lap_lambda:     Coupling weight in the cost functional
-            umax, umin:     Control value constraints
-            turn_cpl_off:   Turn coupling off forever when clusters with a desired rad_max achieved
+            Q:                      State-cost weight matrix (for a single cluster)
+            R:                      Control-cost weight matrix (for a single agent and cluster, prefer R = Identity)
+            P:                      Terminal-state-cost weight matrix (for a single agent)
+            n_t_mes:                Number of time steps in the meso-scale part of MPC
+            n_t_cpl:                Number of time steps in the coupling part of MPC
+            rad_max:                Target maximum cluster radius, used to activate coupling
+            lap_lambda:             Coupling weight in the cost functional
+            umax_mes, umin_mes:     Meso-scale control value constraints
+            umax_cpl, umin_cpl:     Coupling control value constraints
+            turn_cpl_off:           Turn coupling off forever when clusters with a desired rad_max achieved
         
         Returns:
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
@@ -399,6 +401,7 @@ class MultiAgentSystem():
                   adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
         if (np.max(clust_rads) > rad_max) and (self.do_coupling):
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
+            #lap_mat_aug = None
         else:
             lap_mat_aug = None
             if turn_cpl_off:
@@ -408,20 +411,19 @@ class MultiAgentSystem():
         goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
         calpha_diag = np.diag(self.cluster_n_agents)
         Q = np.kron(calpha_diag, Q)
-        #Q = np.kron(np.eye(self.n_clusters), Q)
-        R_mes = np.kron(calpha_diag, R)
-        #R_mes = np.kron(np.eye(self.n_clusters), R)
-        R_cpl = np.kron(np.eye(self.n_agents), R)
+        R = np.kron(calpha_diag, R)
         P = np.kron(calpha_diag, P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
-        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R_mes, P, x0_mes, self.agent_dim,
-                                                                               A_cpl, B_cpl, n_t_cpl, R_cpl, x0_cpl, lap_mat_aug, lap_lambda,
+        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R, P, x0_mes, self.agent_dim,
+                                                                               A_cpl, B_cpl, n_t_cpl, x0_cpl, lap_mat_aug, lap_lambda,
                                                                                x_star_in=goal, coll_d=self.coll_d,
-                                                                               umax_mes=umax, umin_mes=umin,
-                                                                               umax_cpl=umax, umin_cpl=umin,)
+                                                                               umax_mes=umax_mes, umin_mes=umin_mes,
+                                                                               umax_cpl=umax_cpl, umin_cpl=umin_cpl,)
         time_1 = time.time()
+        #print("Q: ", (x0_mes - goal) @ Q @ (x0_mes - goal))
+        #print("R: ", u_mes[:, -1] @ R @ cl_dyn[:, -1])
         self.cvx_time += time_1 - time_0
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0

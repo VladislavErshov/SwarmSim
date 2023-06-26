@@ -1,4 +1,0 @@
-n_agents: [1000]
-mpc_n_t: [16]
-rad_max: [20, 10, 5, 2.5]
-control_strategy: ['microcoup', 'mesocoup']
