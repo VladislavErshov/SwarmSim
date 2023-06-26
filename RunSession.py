@@ -45,7 +45,7 @@ def linear_mpc(
         clust_eps = 1.5, # epsilon-delta clustering parameter epsilon
         agent_dim = 2, # dimensionality of each agent
         control_dim = 2, # diemnsionality of control
-        goal_state = np.array([10, 0]), # goal point coordinates
+        goal_state = np.array([100, 0]), # goal point coordinates
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
         u_bound = None, # control constraint absolute value
