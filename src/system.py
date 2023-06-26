@@ -316,7 +316,7 @@ class MultiAgentSystem():
         for cdx, cluster in self.clusters.items():
             clust_rads.append(cluster.rad)
         if (np.max(clust_rads) > rad_max) and (self.do_coupling):
-            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim))
+            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
         else:
             lap_mat_aug = None
             if turn_cpl_off:
@@ -398,7 +398,7 @@ class MultiAgentSystem():
             B_cpl[adx * self.agent_dim : (adx + 1) * self.agent_dim,
                   adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
         if (np.max(clust_rads) > rad_max) and (self.do_coupling):
-            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim))
+            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
         else:
             lap_mat_aug = None
             if turn_cpl_off:
