@@ -45,7 +45,7 @@ def linear_mpc(
         clust_eps = 1.5, # epsilon-delta clustering parameter epsilon
         agent_dim = 2, # dimensionality of each agent
         control_dim = 2, # diemnsionality of control
-        goal_state = np.array([100, 0]), # goal point coordinates
+        goal_state = np.array([10, 0]), # goal point coordinates
         A = np.eye(2), # initial matrix A (state transition) for a linear agent
         B = np.eye(2, 2), # initial matrix B (control transition) for a linear agent
         u_bound = None, # control constraint absolute value
@@ -67,7 +67,7 @@ def linear_mpc(
     R = np.eye(control_dim)
     P = np.eye(agent_dim)#np.zeros((agent_dim, agent_dim))
     if u_bound is None:
-        u_bound = 2 * np.linalg.norm(goal_state, 2) / mpc_n_t
+        u_bound = 1.2 * np.linalg.norm(goal_state, 2) / mpc_n_t
     umax = u_bound
     umin = -u_bound 
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
@@ -75,7 +75,7 @@ def linear_mpc(
                            state_gen_args=[[A], [B], cluster_means, cluster_std],
                            clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
     avg_goal_dist = mas.avg_goal_dist
-    cost_val = np.inf
+    cost_vals = []
     for sdx in range(n_steps):
         if shrink_horizon:
             mpc_n_t_s = min(mpc_n_t, n_steps - sdx)
@@ -83,8 +83,6 @@ def linear_mpc(
         else:
             mpc_n_t_s = mpc_n_t
             mpc_n_t2_s = mpc_n_t2
-        if dynamics_pic_dir is not None:
-            pltr.system_state(mas, goal_state, avg_goal_dist, cost_val, save_path=dynamics_pic_dir + control_strategy + f'_{sdx}.png')
         if control_strategy == 'micro':
             avg_goal_dist, cost_val = mas.update_system_mpc(Q, R, P, n_t=mpc_n_t_s, umax=umax, umin=umin)
         elif control_strategy == 'microdist':
@@ -103,6 +101,9 @@ def linear_mpc(
                                                                          umax=umax, umin=umin)
         else:
             raise NotImplementedError(f"Unknown control strategy '{control_strategy}'")
+        cost_vals.append(cost_val)
+        if dynamics_pic_dir is not None:
+            pltr.system_state(mas, goal_state, avg_goal_dist, cost_vals[sdx], save_path=dynamics_pic_dir + control_strategy + f'_{sdx}.png')
     cvx_time = mas.cvx_time
     cvx_time_nocoup = mas.cvx_time_nocoup
     cvx_gops = mas.cvx_ops / 10e9
@@ -113,7 +114,7 @@ def linear_mpc(
     #print("Total optimization operations w/o coupling (GFLOPs):", cvx_gops_nocoup)
     #print("Final cost:", cost_val)
     #print("Final average goal distance:", avg_goal_dist[-1])
-    return cvx_time, cvx_time_nocoup, cvx_gops, cvx_gops_nocoup, cost_val, avg_goal_dist
+    return cvx_time, cvx_time_nocoup, cvx_gops, cvx_gops_nocoup, cost_vals, avg_goal_dist
 
 
 if __name__ == '__main__':
@@ -140,8 +141,6 @@ if __name__ == '__main__':
         res_dir = f'results/{config_name}/'
         os.makedirs(res_dir, exist_ok=True)
         df_res_path = res_dir + 'statistics.csv'
-        df_dyn_path = res_dir + 'dynamics.csv'
-        df_cost_path = res_dir + 'costs.csv'
 
         if os.path.exists(df_res_path):
             df_res_header = False
@@ -162,35 +161,48 @@ if __name__ == '__main__':
                                                         'avg_goal_dist_MEAN': [],
                                                         'avg_goal_dist_STD': [],}
 
-        if do_dynamics:
-            print("DYNAMICS RUN")
-            dyn_exprt_microcoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'microcoup'}
-            dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
-            print(dyn_exprt_microcoup)
-            print(dyn_exprt_mesocoup)
-            np.random.seed(rnd_seed)
-            _, _, _, _, cost_microcoup, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, dynamics_pic_dir=res_dir)
-            np.random.seed(rnd_seed)
-            _, _, _, _, cost_mesocoup, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, dynamics_pic_dir=res_dir)
-            df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
-            df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
-            df_cost = pd.DataFrame.from_dict({'microcoup': cost_microcoup, 'mesocoup': cost_mesocoup})
-            df_cost.to_csv(df_cost_path, mode='w', header=True, index=False)
+        #if do_dynamics:
+        #    print("DYNAMICS RUN")
+        #    dyn_exprt_microcoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'microcoup'}
+        #    dyn_exprt_mesocoup = {key: val[-1] for key, val in experiment_parameters.items() if key != 'control_strategy'} | {'control_strategy': 'mesocoup'}
+        #    print(dyn_exprt_microcoup)
+        #    print(dyn_exprt_mesocoup)
+        #    np.random.seed(rnd_seed)
+        #    _, _, _, _, cost_microcoup, dyn_microcoup = linear_mpc(**dyn_exprt_microcoup, dynamics_pic_dir=res_dir)
+        #    np.random.seed(rnd_seed)
+        #    _, _, _, _, cost_mesocoup, dyn_mesocoup = linear_mpc(**dyn_exprt_mesocoup, dynamics_pic_dir=res_dir)
+        #    df_dyn = pd.DataFrame.from_dict({'microcoup': dyn_microcoup, 'mesocoup': dyn_mesocoup})
+        #    df_dyn.to_csv(df_dyn_path, mode='w', header=True, index=False)
+        #    df_cost = pd.DataFrame.from_dict({'microcoup': cost_microcoup, 'mesocoup': cost_mesocoup})
+        #    df_cost.to_csv(df_cost_path, mode='w', header=True, index=False)
 
-        if do_statistics:
-            print("STATISTICS RUN")
-            for exprt in exprts:
-                print(exprt)
-                outs = []
-                np.random.seed(rnd_seed)
-                if do_mp:
-                    exprt_list = [exprt for _ in range(n_exper_runs)]
-                    outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
-                else:
-                    for edx in range(n_exper_runs):
-                        task_out = linear_mpc(**exprt)
-                        outs.append(task_out)
-                outs = np.array([(*out[:-1], out[-1][-1]) for out in outs])
+        for exprt in exprts:
+            print(exprt)
+            outs = []
+            np.random.seed(rnd_seed)
+            
+            if do_dynamics:
+                df_dyn_dir = res_dir + f'{exprt}/'
+                os.makedirs(df_dyn_dir, exist_ok=True)
+            else:
+                df_dyn_dir = None
+            
+            if do_mp:
+                exprt_list = [exprt for _ in range(n_exper_runs-1)] + [exprt | {'dynamics_pic_dir': df_dyn_dir}]
+                outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
+            else:
+                for edx in range(n_exper_runs):
+                    task_out = linear_mpc(**exprt)
+                    outs.append(task_out)
+            
+            if do_dynamics:
+                cost_vals = outs[0][-2]
+                avg_goal_dist = outs[0][-1]
+                df_dyn = pd.DataFrame.from_dict({'cost': cost_vals, 'distance': avg_goal_dist})
+                df_dyn.to_csv(df_dyn_dir + 'dynamics.csv', mode='w', header=True, index=False)
+            
+            if do_statistics:
+                outs = np.array([(*out[:-2], out[-2][-1], out[-1][-1]) for out in outs])
                 out_means = np.mean(outs, axis=0) 
                 out_stds = np.std(outs, axis=0) 
                 for key in exprt_keys: 

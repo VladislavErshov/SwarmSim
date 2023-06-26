@@ -59,8 +59,8 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         ax.scatter(cluster_states[cdx][0], cluster_states[cdx][1], 
                     s=40, facecolors='none', edgecolors='#000000', marker='o')
     ax.set_title(f"Avg goal dist: {avg_goal_dist[-1]:.2}; cost: {cost_val:.2f}")
-    ax.set_xlim(-5, goal_state[0] * 1.2)
-    ax.set_ylim(-10, 10)
+    ax.set_xlim(-30, goal_state[0] * 1.2)
+    ax.set_ylim(-100, 100)
     if show:
         plt.show() 
     if save_path is not None:
