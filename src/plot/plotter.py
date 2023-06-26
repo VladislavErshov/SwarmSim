@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.ticker as mticker
 import numpy as np
 
 
@@ -14,16 +15,22 @@ rename = {
     'control_strategy': 'control strategy',
     'solution_time': 'solution_time',
     'cvx_time': 'solution time',
+    'cvx_time_nocoup': 'solution time',
     'cvx_ops': 'solution FLOPs',
+    'cvx_ops_nocoup': 'solution FLOPs',
     'cost_val': 'cost value',
+    'rad_max': r'cluster radius $\delta$',
     'avg_goal_dist': 'average distance to the goal',
 }
 
 units = {
     'solution_time': 'seconds',
     'cvx_time': 'seconds',
+    'cvx_time_nocoup': 'seconds',
     'cvx_ops': 'GFLOPs',
+    'cvx_ops_nocoup': 'GFLOPs',
     'cost_val': 'cost',
+    'rad_max': 'cluster radius',
     'avg_goal_dist': r'$\ell_2$ distance',
 }
 
@@ -60,7 +67,7 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         plt.savefig(save_path)
 
 
-def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols):
+def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', xbase=10):
     colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
@@ -70,6 +77,9 @@ def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols):
                         c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
                         label=rename[strat])
             ax.grid('major')
+            ax.set_xscale(xscale, base=xbase)
+            ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+            ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
             ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
             ax.set_ylabel(f'value, {units[data_name]}')
             ax.set_xlabel(rename[param_col])
