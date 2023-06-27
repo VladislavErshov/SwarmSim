@@ -20,6 +20,20 @@ if PYPAPI_SPEC is not None:
         PYPAPI_SPEC = None
 
 
+def _lin_sys(x, A, u, B):
+    return A @ x + B @ u
+
+
+def _true_cost(x0, goal, A, B, u_seq, Q, R, P, T):
+    cost = 0
+    x = x0
+    for t in range(T):
+        cost += (x - goal) @ Q @ (x - goal) + u_seq[t] @ R @ u_seq[t]
+        x = _lin_sys(x, A, u_seq[t], B)
+    cost += (x - goal) @ P @ (x - goal)
+    return cost
+
+
 class MultiAgentSystem():
     """A multi-agent system dynamics simulator."""
 
@@ -335,6 +349,11 @@ class MultiAgentSystem():
                                                                               umax=umax, umin=umin,)
         time_1 = time.time()
         self.cvx_time += time_1 - time_0
+        
+        x0_true = self.agent_states.flatten()
+        true_cost = _true_cost(x0_true, goal, A, B,
+                               u_dynamics.T, Q, R, P, n_t_mic)
+
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
@@ -347,7 +366,7 @@ class MultiAgentSystem():
             #    agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, tdx])
             agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
         self._re_eval_system(self.do_coupling)
-        return self.avg_goal_dist, cost_val
+        return self.avg_goal_dist, cost_val, true_cost
 
     def update_system_mpc_mesocoupling(self, Q, R, P, 
                                        n_t_mes=8, n_t_cpl=2, 
@@ -410,21 +429,34 @@ class MultiAgentSystem():
         x0_cpl = self.agent_states.flatten()
         goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
         calpha_diag = np.diag(self.cluster_n_agents)
-        Q = np.kron(calpha_diag, Q)
-        R = np.kron(calpha_diag, R)
-        P = np.kron(calpha_diag, P)
+        Q_mes = np.kron(calpha_diag, Q)
+        R_mes = np.kron(calpha_diag, R)
+        P_mes = np.kron(calpha_diag, P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.time()
-        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q, R, P, x0_mes, self.agent_dim,
+        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q_mes, R_mes, P_mes, x0_mes, self.agent_dim,
                                                                                A_cpl, B_cpl, n_t_cpl, x0_cpl, lap_mat_aug, lap_lambda,
                                                                                x_star_in=goal, coll_d=self.coll_d,
                                                                                umax_mes=umax_mes, umin_mes=umin_mes,
                                                                                umax_cpl=umax_cpl, umin_cpl=umin_cpl,)
         time_1 = time.time()
-        #print("Q: ", (x0_mes - goal) @ Q @ (x0_mes - goal))
-        #print("R: ", u_mes[:, -1] @ R @ cl_dyn[:, -1])
         self.cvx_time += time_1 - time_0
+        
+        x0_true = self.agent_states.flatten()
+        goal_true = np.kron(np.ones((self.n_agents)), self.system_goal)
+        m = np.zeros((self.n_agents, self.n_clusters))
+        for i in range(self.n_agents):
+            alpha = self.clust_labels[i]
+            m[i, alpha] = 1
+        b_true = B_cpl @ np.kron(m, np.eye(self.agent_dim))
+        a_true = A_cpl
+        q_true = np.kron(np.eye(self.n_agents), Q)
+        r_true = R_mes
+        p_true = np.kron(np.eye(self.n_agents), P)
+        true_cost = _true_cost(x0_true, goal_true, a_true, b_true,
+                               u_mes.T, q_true, r_true, p_true, n_t_mes)
+
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
@@ -440,7 +472,7 @@ class MultiAgentSystem():
             for adx, agent in self.agents.items():
                 agent.propagate_input(u_cpl[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
         self._re_eval_system(self.do_coupling)
-        return self.avg_goal_dist, cost_val
+        return self.avg_goal_dist, cost_val, true_cost
 
 
 class LinearAgentNd():

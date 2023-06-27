@@ -19,7 +19,10 @@ rename = {
     'cvx_ops': 'solution FLOPs',
     'cvx_ops_nocoup': 'solution FLOPs',
     'cost_val': 'cost value',
+    'j0_val': r'$J_0$ cost value',
+    'j0': r'$J_0$ cost value',
     'rad_max': r'cluster radius $\delta$',
+    'cluster_rad': r'cluster radius $\delta$',
     'avg_goal_dist': 'average distance to the goal',
 }
 
@@ -30,6 +33,8 @@ units = {
     'cvx_ops': 'GFLOPs',
     'cvx_ops_nocoup': 'GFLOPs',
     'cost_val': 'cost',
+    'j0_val': 'cost',
+    'j0': 'cost',
     'rad_max': 'cluster radius',
     'avg_goal_dist': r'$\ell_2$ distance',
 }
@@ -90,7 +95,7 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
                 ax.set_yscale(yscale, base=ylogbase)
             else:
                 ax.set_yscale(yscale)
-            ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+            #ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
             #ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
             ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
             ax.set_ylabel(f'value, {units[data_name]}')
