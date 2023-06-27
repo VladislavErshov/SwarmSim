@@ -49,8 +49,8 @@ def random_blobs(agent_class, agent_dim=1, n_agents=1,
                  As=[1], Bs=[1], 
                  cluster_data=1, cluster_std=1):
     """
-    Set initial agent states by randomized truncated gaussian blobs
-    parametrized by cluster centroids and diameters.
+    Set initial agent states by randomized gaussian blobs
+    parametrized by cluster centroids and standard deviation.
     
     Args:
         agent_class:        Class of an agent
@@ -73,3 +73,36 @@ def random_blobs(agent_class, agent_dim=1, n_agents=1,
     agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
     return agents
 
+
+def uni_ball(agent_class, agent_dim=1, n_agents=1, 
+             As=[1], Bs=[1], 
+             cluster_data=[(0, 0)], cluster_rad=1):
+    """
+    Set initial agent states by randomized uniform blobs 
+    parametrized by cluster centroids and a radius.
+    
+    Args:
+        agent_class:        Class of an agent
+        agent_dim:          Agent dimensionality
+        n_agents:           Number of agents in the system to initialize
+        As:                 State transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        Bs:                 Control transition matrices for each agent
+                            OR a list with a single matrix for all agents
+        cluster_data:       Cluster centroid coordinates for each cluster
+        cluster_rad:        Radius of a cluster
+    
+    Returns:
+        agents:             Dictionary of agent objects
+    """
+    assert len(As) == len(Bs) 
+    n_ag_percluster = n_agents // len(cluster_data)
+    states = np.zeros((n_agents, agent_dim))
+    for cdx, centroid in enumerate(cluster_data):
+        r = np.sqrt(np.random.uniform(0, cluster_rad, n_ag_percluster))
+        a = np.pi * np.random.uniform(0, 2, n_ag_percluster)
+        xy = np.array([r * np.cos(a), r * np.sin(a)]).T
+        xy += centroid
+        states[cdx*n_ag_percluster:(cdx+1)*n_ag_percluster, :] = xy
+    agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
+    return agents

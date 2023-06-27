@@ -43,7 +43,8 @@ translation_table = str.maketrans('', '', ''.join(["'", ":", "{", "}", ","]))
 def linear_mpc(
         n_agents = 1000, # number of agents
         cluster_means = [(0, 5), (0, -5)], # coordinates of initial cluster centroids for each cluster
-        cluster_std = 0.8, # standard deviation for gaussian blob cluster initialization
+        #cluster_std = 0.8, # standard deviation for gaussian blob cluster initialization
+        cluster_rad = 1, # radius for uniform blob cluster initialization
         clust_eps = 1.5, # epsilon-delta clustering parameter epsilon
         agent_dim = 2, # dimensionality of each agent
         control_dim = 2, # diemnsionality of control
@@ -76,8 +77,8 @@ def linear_mpc(
     umax_cpl = 1
     umin_cpl = -1
     mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state, 
-                           state_gen=gen.random_blobs, 
-                           state_gen_args=[[A], [B], cluster_means, cluster_std],
+                           state_gen=gen.uni_ball, 
+                           state_gen_args=[[A], [B], cluster_means, cluster_rad],
                            clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
     mas.do_coupling = do_coupling
     avg_goal_dist = mas.avg_goal_dist
