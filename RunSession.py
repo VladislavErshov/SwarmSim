@@ -3,7 +3,6 @@ import warnings
 import yaml
 #import argparse
 import sys
-import itertools
 import os
 import pandas as pd
 
@@ -11,6 +10,7 @@ from src.system import MultiAgentSystem, PYPAPI_SPEC
 import src.state_generator as gen
 import src.plot.plotter as pltr
 from src.multiprocessing.mp_wrapper import mp_kwargs_wrapper
+from src.utils import product_dict, translation_table
 
 
 
@@ -19,11 +19,6 @@ with open('cfg/seed.yaml') as f:
     rnd_seed = seed_data['RND_SEED']
 
 warnings.filterwarnings('ignore')
-
-def product_dict(**kwargs):
-    keys = kwargs.keys()
-    for instance in itertools.product(*kwargs.values()):
-        yield dict(zip(keys, instance))
 
 #parser = argparse.ArgumentParser()
 #parser.add_argument('-c', '--config', help="Config name", required=False, default='exprt_1')
@@ -36,7 +31,6 @@ if len(sys.argv) == 1:
 else:
     configs = sys.argv[1:]
 
-translation_table = str.maketrans('', '', ''.join(["'", ":", "{", "}", ","]))
 
 # Initialize obstacles [TODO]
 
@@ -159,17 +153,17 @@ if __name__ == '__main__':
 
         exprt_keys = exprts[0].keys()
         df_res_dict = {key: [] for key in exprt_keys} | {'cvx_time_MEAN': [],
-                                                        'cvx_time_STD': [],
-                                                        'cvx_time_nocoup_MEAN': [],
-                                                        'cvx_time_nocoup_STD': [],
-                                                        'cvx_ops_MEAN': [],
-                                                        'cvx_ops_STD': [],
-                                                        'cvx_ops_nocoup_MEAN': [],
-                                                        'cvx_ops_nocoup_STD': [],
-                                                        'cost_val_MEAN': [],
-                                                        'cost_val_STD': [],
-                                                        'avg_goal_dist_MEAN': [],
-                                                        'avg_goal_dist_STD': [],}
+                                                         'cvx_time_STD': [],
+                                                         'cvx_time_nocoup_MEAN': [],
+                                                         'cvx_time_nocoup_STD': [],
+                                                         'cvx_ops_MEAN': [],
+                                                         'cvx_ops_STD': [],
+                                                         'cvx_ops_nocoup_MEAN': [],
+                                                         'cvx_ops_nocoup_STD': [],
+                                                         'cost_val_MEAN': [],
+                                                         'cost_val_STD': [],
+                                                         'avg_goal_dist_MEAN': [],
+                                                         'avg_goal_dist_STD': [],}
 
         #if do_dynamics:
         #    print("DYNAMICS RUN")
