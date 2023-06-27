@@ -43,6 +43,11 @@ units = {
     'distance': r'$\ell_2$ distance',
 }
 
+colors = {
+    'microcoup': 'b',
+    'mesocoup': 'r',
+}
+
 nonestring = 'None'
 
 
@@ -82,13 +87,14 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
                   mean_cols, std_cols, 
                   xscale='log', yscale='log', xlogbase=10, ylogbase=10, 
                   save_dir=None):
-    colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
+    #colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
+    plt.rcParams.update({'font.size': 14})
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
-        fig, ax = plt.subplots(figsize=(6, 4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=140)
         for sdx, (strat, df) in enumerate(dfs_perstrat.items()):
             ax.errorbar(xvalues, df[means], df[stds], 
-                        c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
+                        c=colors[strat], elinewidth=1, capsize=2, capthick=1,
                         label=rename[strat])
             ax.grid('major')
             if xscale == 'log':
@@ -107,23 +113,25 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
             ax.legend()
         #plt.show()
         if save_dir is not None:
-            plt.savefig(save_dir + f'{data_name}_{param_col}.png')
+            plt.savefig(save_dir + f'{data_name}_{param_col}.png', bbox_inches='tight')
 
 
 def exprt_dynamics(data, nd, info_string, info_string_simple, save_dir):
-    x = np.arange(nd)
+    x = np.arange(nd) + 1
+    plt.rcParams.update({'font.size': 18})
     for ftr, subdat in data.items():
-        colors = cm.rainbow(np.linspace(0, 1, len(list(subdat.keys()))))
-        fig, ax = plt.subplots(figsize=(6, 4), dpi=140)
+        #colors = cm.rainbow(np.linspace(0, 1, len(list(subdat.keys()))))
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=200)
         for sdx, (strat, ssdat) in enumerate(subdat.items()):
-            ax.plot(x, ssdat, 
-                    c=colors[sdx], linewidth=1,
+            ax.plot(x[3:], ssdat[3:], 
+                    c=colors[strat], linewidth=1,
                     label=rename[strat])
         ax.grid('major')
+        ax.tick_params(axis='both', which='major', labelsize=10)
         ax.set_title(rename[ftr] + ', ' + info_string)
         ax.set_ylabel(f'value, {units[ftr]}')
         ax.set_xlabel(r'$\tau$')
         ax.legend()
         #plt.show()
         if save_dir is not None:
-            plt.savefig(save_dir + f'{ftr}_{info_string_simple}.png')
+            plt.savefig(save_dir + f'{ftr}_{info_string_simple}.png', bbox_inches='tight')
