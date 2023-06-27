@@ -268,7 +268,7 @@ class MultiAgentSystem():
             #for tdx in range(n_t):
             #    cluster.propagate_input(u_dynamics[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, tdx])
             cluster.propagate_input(u_dynamics[cdx * self.agent_dim : (cdx + 1) * self.agent_dim, 0])
-        self._re_eval_system()
+        self._re_eval_system(self.do_coupling)
         return self.avg_goal_dist, cost_val
 
     def update_system_mpc_microcoupling(self, Q, R, P, 
@@ -346,7 +346,7 @@ class MultiAgentSystem():
             #for tdx in range(n_t):
             #    agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, tdx])
             agent.propagate_input(u_dynamics[adx * self.agent_dim : (adx + 1) * self.agent_dim, 0])
-        self._re_eval_system()
+        self._re_eval_system(self.do_coupling)
         return self.avg_goal_dist, cost_val
 
     def update_system_mpc_mesocoupling(self, Q, R, P, 

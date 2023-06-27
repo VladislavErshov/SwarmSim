@@ -1,3 +1,4 @@
-n_agents: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+#n_agents: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+n_agents: [1000]
 mpc_n_t: [16]
-control_strategy: ['microcoup', 'mesocoup']
+control_strategy: ['microcoup']

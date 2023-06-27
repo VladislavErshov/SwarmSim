@@ -69,7 +69,10 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         plt.savefig(save_path)
 
 
-def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale='log', save_dir=None):
+def exprt_results(dfs_perstrat, param_col, xvalues, 
+                  mean_cols, std_cols, 
+                  xscale='log', yscale='log', xlogbase=10, ylogbase=10, 
+                  save_dir=None):
     colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
@@ -79,10 +82,16 @@ def exprt_results(dfs_perstrat, param_col, xvalues, mean_cols, std_cols, xscale=
                         c=colors[sdx], elinewidth=1, capsize=2, capthick=1,
                         label=rename[strat])
             ax.grid('major')
-            ax.set_xscale(xscale)
-            ax.set_yscale(xscale)
+            if xscale == 'log':
+                ax.set_xscale(xscale, base=xlogbase)
+            else:
+                ax.set_xscale(xscale)
+            if yscale == 'log':
+                ax.set_yscale(yscale, base=ylogbase)
+            else:
+                ax.set_yscale(yscale)
             ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-            ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+            #ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
             ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
             ax.set_ylabel(f'value, {units[data_name]}')
             ax.set_xlabel(rename[param_col])

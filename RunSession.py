@@ -60,6 +60,7 @@ def linear_mpc(
         control_strategy = 'mesocoup', # control strategy
         dynamics_pic_dir = None, # None if prefer not to save dynamics plots, path to the save directory otherwise 
         shrink_horizon = False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
+        do_coupling = True, # 'True' if compute coupling at the start of optimization
     ):
     if mpc_n_t2 is None:
         mpc_n_t2 = mpc_n_t
@@ -78,6 +79,7 @@ def linear_mpc(
                            state_gen=gen.random_blobs, 
                            state_gen_args=[[A], [B], cluster_means, cluster_std],
                            clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
+    mas.do_coupling = do_coupling
     avg_goal_dist = mas.avg_goal_dist
     cost_vals = [np.inf]
     for sdx in range(n_steps):
