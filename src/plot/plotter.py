@@ -19,11 +19,13 @@ rename = {
     'cvx_ops': 'solution FLOPs',
     'cvx_ops_nocoup': 'solution FLOPs',
     'cost_val': 'cost value',
+    'cost': 'cost value',
     'j0_val': r'$J_0$ cost value',
     'j0': r'$J_0$ cost value',
     'rad_max': r'cluster radius $\delta$',
     'cluster_rad': r'cluster radius $\delta$',
     'avg_goal_dist': 'average distance to the goal',
+    'distance': 'average distance to the goal',
 }
 
 units = {
@@ -33,10 +35,12 @@ units = {
     'cvx_ops': 'GFLOPs',
     'cvx_ops_nocoup': 'GFLOPs',
     'cost_val': 'cost',
+    'cost': 'cost',
     'j0_val': 'cost',
     'j0': 'cost',
     'rad_max': 'cluster radius',
     'avg_goal_dist': r'$\ell_2$ distance',
+    'distance': r'$\ell_2$ distance',
 }
 
 nonestring = 'None'
@@ -104,3 +108,22 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
         #plt.show()
         if save_dir is not None:
             plt.savefig(save_dir + f'{data_name}_{param_col}.png')
+
+
+def exprt_dynamics(data, nd, info_string, info_string_simple, save_dir):
+    x = np.arange(nd)
+    for ftr, subdat in data.items():
+        colors = cm.rainbow(np.linspace(0, 1, len(list(subdat.keys()))))
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=140)
+        for sdx, (strat, ssdat) in enumerate(subdat.items()):
+            ax.plot(x, ssdat, 
+                    c=colors[sdx], linewidth=1,
+                    label=rename[strat])
+        ax.grid('major')
+        ax.set_title(rename[ftr] + ', ' + info_string)
+        ax.set_ylabel(f'value, {units[ftr]}')
+        ax.set_xlabel(r'$\tau$')
+        ax.legend()
+        #plt.show()
+        if save_dir is not None:
+            plt.savefig(save_dir + f'{ftr}_{info_string_simple}.png')
