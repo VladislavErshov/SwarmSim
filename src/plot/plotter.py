@@ -29,15 +29,15 @@ rename = {
 }
 
 units = {
-    'solution_time': 'seconds',
-    'cvx_time': 'seconds',
-    'cvx_time_nocoup': 'seconds',
-    'cvx_ops': 'GFLOPs',
-    'cvx_ops_nocoup': 'GFLOPs',
-    'cost_val': 'cost',
-    'cost': 'cost',
-    'j0_val': 'cost',
-    'j0': 'cost',
+    'solution_time': 'time, seconds',
+    'cvx_time': 'time, seconds',
+    'cvx_time_nocoup': 'time, seconds',
+    'cvx_ops': 'operations, GFLOPs',
+    'cvx_ops_nocoup': 'operations, GFLOPs',
+    'cost_val': 'cost value',
+    'cost': 'cost value',
+    'j0_val': 'cost value',
+    'j0': 'cost value',
     'rad_max': 'cluster radius',
     'avg_goal_dist': r'$\ell_2$ distance',
     'distance': r'$\ell_2$ distance',
@@ -91,7 +91,7 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
     plt.rcParams.update({'font.size': 14})
     for means, stds in zip(mean_cols, std_cols):
         data_name = means[:-5]
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=140)
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=140)
         for sdx, (strat, df) in enumerate(dfs_perstrat.items()):
             ax.errorbar(xvalues, df[means], df[stds], 
                         c=colors[strat], elinewidth=1, capsize=2, capthick=1,
@@ -107,21 +107,23 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
                 ax.set_yscale(yscale)
             #ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
             #ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+            ax.tick_params(axis='both', which='major', labelsize=10)
             ax.set_title(f'{rename[data_name]}: variable {rename[param_col]}')
-            ax.set_ylabel(f'value, {units[data_name]}')
+            ax.set_ylabel(units[data_name])
             ax.set_xlabel(rename[param_col])
             ax.legend()
         #plt.show()
         if save_dir is not None:
-            plt.savefig(save_dir + f'{data_name}_{param_col}.png', bbox_inches='tight')
+            plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+            plt.savefig(save_dir + f'{data_name}_{param_col}.png')#, bbox_inches='tight')
 
 
 def exprt_dynamics(data, nd, info_string, info_string_simple, save_dir):
     x = np.arange(nd) + 1
-    plt.rcParams.update({'font.size': 18})
+    plt.rcParams.update({'font.size': 14})
     for ftr, subdat in data.items():
         #colors = cm.rainbow(np.linspace(0, 1, len(list(subdat.keys()))))
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=200)
+        fig, ax = plt.subplots(figsize=(6, 2), dpi=140)
         for sdx, (strat, ssdat) in enumerate(subdat.items()):
             ax.plot(x[3:], ssdat[3:], 
                     c=colors[strat], linewidth=1,
@@ -129,9 +131,10 @@ def exprt_dynamics(data, nd, info_string, info_string_simple, save_dir):
         ax.grid('major')
         ax.tick_params(axis='both', which='major', labelsize=10)
         ax.set_title(rename[ftr] + ', ' + info_string)
-        ax.set_ylabel(f'value, {units[ftr]}')
+        ax.set_ylabel(units[ftr])
         ax.set_xlabel(r'$\tau$')
         ax.legend()
         #plt.show()
         if save_dir is not None:
-            plt.savefig(save_dir + f'{ftr}_{info_string_simple}.png', bbox_inches='tight')
+            plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+            plt.savefig(save_dir + f'{ftr}_{info_string_simple}.png')#, bbox_inches='tight')
