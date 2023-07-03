@@ -1,3 +1,0 @@
-n_agents: [100]
-mpc_n_t: [16]
-control_strategy: ['microcoup', 'mesocoup']

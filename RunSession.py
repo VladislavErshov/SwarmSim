@@ -14,9 +14,9 @@ from src.utils import product_dict, translation_table
 
 
 
-with open('cfg/seed.yaml') as f:
-    seed_data = yaml.load(f, Loader=yaml.FullLoader)
-    rnd_seed = seed_data['RND_SEED']
+#with open('cfg/seed.yaml') as f:
+#    seed_data = yaml.load(f, Loader=yaml.FullLoader)
+#    rnd_seed = seed_data['RND_SEED']
 
 warnings.filterwarnings('ignore')
 
@@ -123,18 +123,21 @@ def linear_mpc(
 
 if __name__ == '__main__':
 
+    with open(f'cfg/metaparams.yaml') as f:
+        metaparams = yaml.load(f, Loader=yaml.FullLoader)
+    n_exper_runs = metaparams['n_exper_runs']
+    do_mp = metaparams['multiprocess']
+    do_dynamics = metaparams['do_dynamics']
+    do_statistics = metaparams['do_statistics']
+    rnd_seed = metaparams['rnd_seed']
+    if rnd_seed is not False:
+        np.random.seed(rnd_seed)
+
     # Load config
     for config_name in configs:
         with open(f'cfg/{config_name}.yaml') as f:
             experiment_parameters = yaml.load(f, Loader=yaml.FullLoader)
         exprts = list(product_dict(**experiment_parameters))
-
-        with open(f'cfg/metaparams.yaml') as f:
-            metaparams = yaml.load(f, Loader=yaml.FullLoader)
-        n_exper_runs = metaparams['n_exper_runs']
-        do_mp = metaparams['multiprocess']
-        do_dynamics = metaparams['do_dynamics']
-        do_statistics = metaparams['do_statistics']
 
         if PYPAPI_SPEC is not None:
             print("OP count enabled")

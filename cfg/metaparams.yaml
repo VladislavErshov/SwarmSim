@@ -2,3 +2,4 @@ n_exper_runs: 30
 do_dynamics: True
 do_statistics: True
 multiprocess: True
+rnd_seed: 1337 

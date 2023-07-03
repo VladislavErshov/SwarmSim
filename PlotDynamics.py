@@ -1,5 +1,6 @@
 import pandas as pd
 import src.plot.plotter as pltr
+import sys
 
 from src.utils import product_dict, translation_table
 
