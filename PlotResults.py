@@ -4,7 +4,7 @@ import src.plot.plotter as pltr
 
 
 if __name__ == '__main__':
-    exper_name = 'exprt_7'
+    exper_name = 'exprt_8'
     xscale = 'log'
     xbase = 10
     yscale = 'linear'

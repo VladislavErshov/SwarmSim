@@ -114,6 +114,7 @@ def exprt_results(dfs_perstrat, param_col, xvalues,
             ax.legend()
         #plt.show()
         if save_dir is not None:
+            plt.gca().invert_xaxis()
             plt.tight_layout(pad=0, w_pad=0, h_pad=0)
             plt.savefig(save_dir + f'{data_name}_{param_col}.png')#, bbox_inches='tight')
 
