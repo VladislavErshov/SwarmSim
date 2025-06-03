@@ -8,3 +8,4 @@
 **/pic_pairs
 **/*.zip
 **/dnz_results*
+**/.venv
