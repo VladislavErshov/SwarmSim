@@ -42,8 +42,8 @@ def conventional_solve(A, B, N, Q, R, P, x0, adim,
 
         # TODO: make convex
         if coll_d is not None:
-            for idx in range(nx//adim):
-                for jdx in range(idx+1, nx//adim):
+            for idx in range(nx // adim):
+                for jdx in range(idx + 1, nx // adim):
                     constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
 
     if x_star_in is not None:
