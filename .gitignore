@@ -9,3 +9,8 @@
 **/*.zip
 **/dnz_results*
 **/.venv
+**/env
+**/*.idea
+**/*.png
+**/*.csv
+**/*.yaml
