@@ -51,7 +51,6 @@ def linear_mpc(
     mpc_n_t2=2,  # MPC horizon for the coupling term
     rad_max=2.,  # target maximum cluster radius
     lap_lambda=1.,  # coupling weight
-    # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
     coll_d=None,
     control_strategy='mesocoup',  # control strategy
     # None if prefer not to save dynamics plots, path to the save directory otherwise
