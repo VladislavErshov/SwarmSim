@@ -64,8 +64,7 @@ class MultiAgentSystem:
                 ________________________________________________
                 epsdel      | epsilon, delta
                 hdbscan     | alpha, leaf_size, min_cluster_size
-            coll_d:                 Agent diameter for collision avoidance 
-                                    [NOTE: LEAVE IT None FOR NOW!!!]
+            coll_d:                 Agent diameter for collision avoidance
                                     [TODO: different agent sizes]
         """
         self.n_agents = n_agents
@@ -91,34 +90,32 @@ class MultiAgentSystem:
         """Re-evaluate full system state by gathering each agent states"""
         for idx, agent in self.agents.items():
             self.agent_states[idx] = agent.state
-        self.avg_goal_dist.append(np.linalg.norm(
-            self.agent_states - self.system_goal, axis=1).mean(axis=0))
+        self.avg_goal_dist.append(np.linalg.norm(self.agent_states - self.system_goal, axis=1).mean(axis=0))
         self._re_eval_clusters(re_compute_clusters)
 
     def _re_eval_clusters(self, re_compute_clusters=True):
         """Re-evaluate clusters"""
         if re_compute_clusters:
-            algo = self.clust_algo
+            algorithm = self.clust_algo
             algo_parameters = self.clust_algo_params
-            if algo == 'epsdel':
+            if algorithm == 'epsdel':
                 epsv, delv = algo_parameters
-                self.clust_labels, _, _, lap_mat = epsdel_clustering(
-                    self.agent_states, epsv, delv)
+                self.clust_labels, _, _, lap_mat = epsdel_clustering(self.agent_states, epsv, delv)
                 self.laplacian = lap_mat
-            elif algo == 'hdbscan':
+            elif algorithm == 'hdbscan':
                 # TODO adjacency and Laplacian matrices
-                raise NotImplementedError(
-                    "Sorry! The method is not functioning at the moment. Plaese, use 'epsdel' method.")
+                raise NotImplementedError("Sorry! The method is not functioning at the moment. Please, use 'epsdel' method.")
                 alpha, leaf_size, min_cluster_size = algo_parameters
-                clusterer = hdbscan.HDBSCAN(alpha=alpha,
-                                            leaf_size=leaf_size,
-                                            min_cluster_size=min_cluster_size,
-                                            min_samples=1)
+                clusterer = hdbscan.HDBSCAN(
+                    alpha=alpha,
+                    leaf_size=leaf_size,
+                    min_cluster_size=min_cluster_size,
+                    min_samples=1
+                )
                 clusterer.fit(self.agent_states)
                 self.clust_labels = clusterer.labels_
             else:
-                raise ValueError(
-                    "Cluster identification algorithm not implemented. Plaese, use 'hierarchy' method.")
+                raise ValueError("Cluster identification algorithm not implemented. Please, use 'hierarchy' method.")
 
             self.n_clusters = max(self.clust_labels) + 1
             self.clusters = {}
@@ -186,9 +183,9 @@ class MultiAgentSystem:
             state_dynamics, u_dynamics, cost_val_agent = mpc_solver.conventional_solve(
                 A, B, n_t,
                 Q, R, P, x0, self.agent_dim,
+                u_max=umax, u_min=umin,
                 x_star_in=self.system_goal,
-                coll_d=self.coll_d,
-                umax=umax, umin=umin
+                coll_d=self.coll_d
             )
             cost_val += cost_val_agent
             # for tdx in range(n_t):
@@ -212,7 +209,7 @@ class MultiAgentSystem:
         """
         Full-state MPC algorithm: agent states are corrected
         according to a micro-scale controller derived by optimizing MPC cost
-        for the full system state by combining each agent state into a 
+        for the full system state by combining each agent state into a
         'n_agents * agent_dim'-dimensional vector.
 
         Args:
@@ -244,9 +241,9 @@ class MultiAgentSystem:
         state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(
             A, B, n_t,
             Q, R, P, x0, self.agent_dim,
+            u_max=umax, u_min=umin,
             x_star_in=goal,
-            coll_d=self.coll_d,
-            umax=umax, umin=umin
+            coll_d=self.coll_d
         )
 
         x0_true = self.agent_states.flatten()
@@ -268,7 +265,7 @@ class MultiAgentSystem:
         Cluster control MPC algorithm: agent states are corrected
         according to a meso-scale controller derived by optimizing MPC cost
         for the cluster states by combining full system states state into a 
-        'n_clusters * agent_dim'-dimensional vector.
+        'n_clusters * agent_dim' - dimensional vector.
 
         Args:
             Q:              State-cost weight matrix (for a single cluster)
@@ -298,9 +295,9 @@ class MultiAgentSystem:
         state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(
             A, B, n_t,
             Q, R, P, x0, self.agent_dim,
+            u_max=umax, u_min=umin,
             x_star_in=goal,
-            coll_d=self.coll_d,
-            umax=umax, umin=umin
+            coll_d=self.coll_d
         )
 
         x0_true = self.cluster_states.flatten()
@@ -361,7 +358,7 @@ class MultiAgentSystem:
             A[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
             B[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
         for cdx, cluster in self.clusters.items():
-            clust_rads.append(cluster.rad)
+            clust_rads.append(cluster.radius)
         if (np.max(clust_rads) > rad_max) and (self.do_coupling):
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
         else:
@@ -381,7 +378,7 @@ class MultiAgentSystem:
             self.agent_dim, n_t_cpl,
             lap_mat_aug, lap_lambda,
             x_star_in=goal, coll_d=self.coll_d,
-            umax=umax, umin=umin,
+            u_max=umax, u_min=umin,
         )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0
@@ -413,7 +410,7 @@ class MultiAgentSystem:
     ):
         """
         Cluster control with coupling MPC algorithm: agent states are corrected
-        according to a meso- and micro- scale controllers derived by optimizing 
+        according to a meso- and micro-scale controllers derived by optimizing
         MPC cost for the cluster states and coupling terms. Cluster states are 
         packed into a 'n_clusters * agent_dim'-dimensional vector. Coupling terms
         are regular agent states packed into a 'n_clusters * agent_dim'-dimensional
@@ -443,15 +440,15 @@ class MultiAgentSystem:
         A_cpl = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
         B_mes = np.zeros((self.agent_dim * self.n_clusters, self.control_dim * self.n_clusters))
         B_cpl = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
-        clust_rads = []
+        clust_radii = []
         for cdx, cluster in self.clusters.items():
             A_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.A
             B_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
-            clust_rads.append(cluster.rad)
+            clust_radii.append(cluster.radius)
         for adx, agent in self.agents.items():
             A_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
             B_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
-        if (np.max(clust_rads) > rad_max) and (self.do_coupling):
+        if np.max(clust_radii) > rad_max and self.do_coupling:
             lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
             # lap_mat_aug = None
         else:
@@ -472,8 +469,8 @@ class MultiAgentSystem:
             A_mes, B_mes, n_t_mes, Q_mes, R_mes, P_mes, x0_mes, self.agent_dim,
             A_cpl, B_cpl, n_t_cpl, x0_cpl, lap_mat_aug, lap_lambda,
             x_star_in=goal, coll_d=self.coll_d,
-            umax_mes=umax_mes, umin_mes=umin_mes,
-            umax_cpl=umax_cpl, umin_cpl=umin_cpl,
+            u_max_mes=umax_mes, u_min_mes=umin_mes,
+            u_max_cpl=umax_cpl, u_min_cpl=umin_cpl,
         )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0
@@ -532,8 +529,7 @@ class LinearAgentNd:
         """Receive a control action and change agent state correspondingly."""
         self.state = self.A @ self.state + self.B @ control_val
 
-    # !!! Prefer not to use
-    def set_state(self, input_state):
+    def _set_state(self, input_state):
         """Manually set specific agent state; avoid using it and prefer propagate_input()."""
         assert self.state.shape == input_state.shape
 
@@ -575,7 +571,4 @@ class LinearClusterNd:
         for idx in range(self.n_agents):
             self.agent_states[idx] = list(self.agents.values())[idx].state
         self.state = np.mean(self.agent_states, axis=0)
-        self.rad = np.linalg.norm(
-            self.agent_states - self.state, axis=1).max(axis=0)
-
-        return self.state, self.rad
+        self.radius = np.linalg.norm(self.agent_states - self.state, axis=1).max(axis=0)
