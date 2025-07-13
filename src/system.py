@@ -513,7 +513,7 @@ class MultiAgentSystem():
         return self.avg_goal_dist, cost_val, true_cost
 
 
-class LinearAgentNd():
+class LinearAgentNd:
     """Linear agent with x[t+1] = Ax[t] + Bu[t] dynamics."""
 
     def __init__(self,
@@ -534,9 +534,12 @@ class LinearAgentNd():
         self.state = init_state
         self.agent_dim = agent_dim
 
-    def propagate_input(self, control_val):
+    def propagate_input(self, control_val, w_mean=0, w_std=1):
         """Receive a control action and change agent state correspondingly."""
-        self.state = self.A @ self.state + self.B @ control_val
+        control = self.B @ control_val
+        normal = np.random.normal(w_mean, w_std, size=self.state.shape)
+        w = [control_i * w_i / 100.0 for control_i, w_i in zip(control, normal)]
+        self.state = self.A @ self.state + control + w
 
     # !!! Prefer not to use
     def set_state(self, input_state):
