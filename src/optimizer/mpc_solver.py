@@ -9,7 +9,8 @@ def conventional_solve(
     A, B, N, Q, R, P, x0, a_dim,
     u_max=None, u_min=None,
     x_min=None, x_max=None,
-    x_star_in=None, coll_d=None
+    x_star_in=None, coll_d=None,
+    obstacles=None
 ):
     """
     Solve a multi-agent MPC problem [TODO: with collision avoidance]
@@ -37,6 +38,7 @@ def conventional_solve(
         constraints += create_state_update_equation_constraint(A, B, t, u, x)
         constraints += create_max_min_state_constraints(t, x, x_max, x_min)
         constraints += create_min_distance_constraints(a_dim, coll_d, nx, t, x)
+        constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles)
 
     if x_star_in is not None:
         cost += 0.5 * cvxpy.quad_form(x[:, N] - x_star, P)  # terminal cost
@@ -183,13 +185,13 @@ def create_state_update_equation_constraint(A, B, t, u, x):
     return [x[:, t + 1] == A * x[:, t] + B * u[:, t]]
 
 
-def create_max_min_state_constraints(N, x, x_max, x_min):
+def create_max_min_state_constraints(t, x, x_max, x_min):
     max_min_state_constraints = []
     if x_min is not None:
-        min_state_constraint = x[:, N] >= x_min[:, 0]
+        min_state_constraint = x[:, t] >= x_min[:, 0]
         max_min_state_constraints.append(min_state_constraint)
     if x_max is not None:
-        max_state_constraint = x[:, N] <= x_max[:, 0]
+        max_state_constraint = x[:, t] <= x_max[:, 0]
         max_min_state_constraints.append(max_state_constraint)
 
     return max_min_state_constraints
@@ -212,15 +214,34 @@ def create_input_constraints(u, u_max, u_min):
 
 
 def create_min_distance_constraints(a_dim, coll_d, nx, t, x):
-    # TODO: make convex
     min_distance_constraints = []
-    if coll_d is not None:
-        num_agents = nx // a_dim
-        for idx in range(num_agents):
-            for jdx in range(idx + 1, num_agents):
-                slice1 = x[idx * a_dim: (idx + 1) * a_dim, t]
-                slice2 = x[jdx * a_dim: (jdx + 1) * a_dim, t]
-                min_distance_constraint = cvxpy.norm1(slice1 - slice2) >= coll_d
-                min_distance_constraints.append(min_distance_constraint)
+    if coll_d is None:
+        return []
 
-    return min_distance_constraints
+    # TODO: make convex
+    num_agents = nx // a_dim
+    for idx in range(num_agents):
+        for jdx in range(idx + 1, num_agents):
+            agent_i_center = x[idx * a_dim : (idx + 1) * a_dim, t]
+            agent_j_center = x[jdx * a_dim : (jdx + 1) * a_dim, t]
+            min_distance_constraint = cvxpy.norm1(agent_i_center - agent_j_center) >= coll_d
+            min_distance_constraints.append(min_distance_constraint)
+
+    return min_distance_constraints[:0]
+
+
+def create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles):
+    avoid_obstacle_constraints = []
+    if coll_d is None or obstacles is None:
+        return []
+
+    # TODO: make convex
+    num_agents = nx // a_dim
+    for idx in range(num_agents):
+        for obstacle in obstacles:
+            agent_i_center = x[idx * a_dim : (idx + 1) * a_dim, t]
+            avoid_obstacle_constraint = cvxpy.norm1(agent_i_center - obstacle['center']) >= coll_d + obstacle['radius']
+            # avoid_obstacle_constraint = cvxpy.norm1(agent_i_center - obstacle['center']) >= coll_d + obstacle['radius']
+            avoid_obstacle_constraints.append(avoid_obstacle_constraint)
+
+    return avoid_obstacle_constraints

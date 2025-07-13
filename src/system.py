@@ -82,6 +82,10 @@ class MultiAgentSystem:
         self.cvx_ops_nocoup = 0
         self.laplacian = None
         self.coll_d = coll_d
+        self.obstacles = [
+            {'center': np.array([2.0, 3.0]), 'radius': 0.5},
+            {'center': np.array([-1.0, 1.0]), 'radius': 0.3},
+        ]
         self.do_coupling = True
         self.clusters = {}
         self._re_eval_system()
@@ -185,7 +189,8 @@ class MultiAgentSystem:
                 Q, R, P, x0, self.agent_dim,
                 u_max=umax, u_min=umin,
                 x_star_in=self.system_goal,
-                coll_d=self.coll_d
+                coll_d=self.coll_d,
+                obstacles=self.obstacles
             )
             cost_val += cost_val_agent
             # for tdx in range(n_t):
@@ -243,7 +248,8 @@ class MultiAgentSystem:
             Q, R, P, x0, self.agent_dim,
             u_max=umax, u_min=umin,
             x_star_in=goal,
-            coll_d=self.coll_d
+            coll_d=self.coll_d,
+            obstacles=self.obstacles
         )
 
         x0_true = self.agent_states.flatten()
@@ -297,7 +303,8 @@ class MultiAgentSystem:
             Q, R, P, x0, self.agent_dim,
             u_max=umax, u_min=umin,
             x_star_in=goal,
-            coll_d=self.coll_d
+            coll_d=self.coll_d,
+            obstacles=self.obstacles
         )
 
         x0_true = self.cluster_states.flatten()
