@@ -51,7 +51,6 @@ def linear_mpc(
     mpc_n_t2=2,  # MPC horizon for the coupling term
     rad_max=2.,  # target maximum cluster radius
     lap_lambda=1.,  # coupling weight
-    # agent diameter for collision avoidance [NOTE: LEAVE IT None FOR NOW!!!]
     coll_d=None,
     control_strategy='mesocoup',  # control strategy
     # None if prefer not to save dynamics plots, path to the save directory otherwise
@@ -73,11 +72,12 @@ def linear_mpc(
     umin = -u_bound
     umax_cpl = 1
     umin_cpl = -1
-    mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state,
-                           state_gen=gen.random_blobs,
-                           state_gen_args=[
-                               [A], [B], cluster_means, cluster_std],
-                           clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
+    mas = MultiAgentSystem(
+        n_agents, agent_dim, control_dim, goal_state,
+        state_gen=gen.random_blobs,
+        state_gen_args=[[A], [B], cluster_means, cluster_std],
+        clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d
+    )
     mas.do_coupling = do_coupling
     avg_goal_dist = mas.avg_goal_dist
     cost_vals = [np.inf]
@@ -90,28 +90,40 @@ def linear_mpc(
             mpc_n_t_s = mpc_n_t
             mpc_n_t2_s = mpc_n_t2
         if dynamics_pic_dir is not None:
-            pltr.system_state(mas, goal_state, avg_goal_dist,
-                              cost_vals[sdx], save_path=dynamics_pic_dir + control_strategy + f'_{sdx}.png')
+            pltr.system_state(
+                mas, goal_state, avg_goal_dist,
+                cost_vals[sdx], save_path=dynamics_pic_dir + control_strategy + f'_{sdx}.png'
+            )
         if control_strategy == 'micro':
-            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc(Q, R, P,
-                                                                     n_t=mpc_n_t_s, umax=umax, umin=umin)
+            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc(
+                Q, R, P,
+                n_t=mpc_n_t_s, umax=umax, umin=umin
+            )
         elif control_strategy == 'microdist':
-            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_distributed(Q, R, P,
-                                                                                 n_t=mpc_n_t_s, umax=umax, umin=umin)
+            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_distributed(
+                Q, R, P,
+                n_t=mpc_n_t_s, umax=umax, umin=umin
+            )
         elif control_strategy == 'meso':
-            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_mesoonly(Q, R, P,
-                                                                              n_t=mpc_n_t_s, umax=umax, umin=umin)
+            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_mesoonly(
+                Q, R, P,
+                n_t=mpc_n_t_s, umax=umax, umin=umin
+            )
         elif control_strategy == 'microcoup':
-            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_microcoupling(Q, R, P,
-                                                                                   n_t_mic=mpc_n_t_s, n_t_cpl=mpc_n_t2_s,
-                                                                                   rad_max=rad_max, lap_lambda=lap_lambda,
-                                                                                   umax=umax, umin=umin)
+            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_microcoupling(
+                Q, R, P,
+                n_t_mic=mpc_n_t_s, n_t_cpl=mpc_n_t2_s,
+                rad_max=rad_max, lap_lambda=lap_lambda,
+                umax=umax, umin=umin
+            )
         elif control_strategy == 'mesocoup':
-            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_mesocoupling(Q, R, P,
-                                                                                  n_t_mes=mpc_n_t_s, n_t_cpl=mpc_n_t2_s,
-                                                                                  rad_max=rad_max, lap_lambda=lap_lambda,
-                                                                                  umax_mes=umax, umin_mes=umin,
-                                                                                  umax_cpl=umax_cpl, umin_cpl=umin_cpl)
+            avg_goal_dist, cost_val, j0_cost = mas.update_system_mpc_mesocoupling(
+                Q, R, P,
+                n_t_mes=mpc_n_t_s, n_t_cpl=mpc_n_t2_s,
+                rad_max=rad_max, lap_lambda=lap_lambda,
+                umax_mes=umax, umin_mes=umin,
+                umax_cpl=umax_cpl, umin_cpl=umin_cpl
+            )
         else:
             raise NotImplementedError(
                 f"Unknown control strategy '{control_strategy}'")
@@ -131,7 +143,6 @@ def linear_mpc(
 
 
 if __name__ == '__main__':
-
     with open(f'cfg/metaparams.yaml') as f:
         metaparams = yaml.load(f, Loader=yaml.FullLoader)
     n_exper_runs = metaparams['n_exper_runs']
@@ -164,18 +175,20 @@ if __name__ == '__main__':
             df_res_header = True
 
         exprt_keys = exprts[0].keys()
-        df_res_dict = {key: [] for key in exprt_keys} | {'cvx_time_MEAN': [],
-                                                         'cvx_time_STD': [],
-                                                         'cvx_time_nocoup_MEAN': [],
-                                                         'cvx_time_nocoup_STD': [],
-                                                         'cvx_ops_MEAN': [],
-                                                         'cvx_ops_STD': [],
-                                                         'cvx_ops_nocoup_MEAN': [],
-                                                         'cvx_ops_nocoup_STD': [],
-                                                         'cost_val_MEAN': [],
-                                                         'cost_val_STD': [],
-                                                         'avg_goal_dist_MEAN': [],
-                                                         'avg_goal_dist_STD': [], }
+        df_res_dict = {key: [] for key in exprt_keys} | {
+            'cvx_time_MEAN': [],
+            'cvx_time_STD': [],
+            'cvx_time_nocoup_MEAN': [],
+            'cvx_time_nocoup_STD': [],
+            'cvx_ops_MEAN': [],
+            'cvx_ops_STD': [],
+            'cvx_ops_nocoup_MEAN': [],
+            'cvx_ops_nocoup_STD': [],
+            'cost_val_MEAN': [],
+            'cost_val_STD': [],
+            'avg_goal_dist_MEAN': [],
+            'avg_goal_dist_STD': [],
+        }
 
         # if do_dynamics:
         #    print("DYNAMICS RUN")
@@ -205,8 +218,7 @@ if __name__ == '__main__':
             else:
                 df_dyn_dir = None
             if do_mp:
-                exprt_list = [exprt for _ in range(
-                    n_exper_runs-1)] + [exprt | {'dynamics_pic_dir': df_dyn_dir}]
+                exprt_list = [exprt for _ in range(n_exper_runs - 1)] + [exprt | {'dynamics_pic_dir': df_dyn_dir}]
                 outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
             else:
                 for edx in range(n_exper_runs):
@@ -217,14 +229,13 @@ if __name__ == '__main__':
                 cost_vals = outs[0][-3]
                 avg_goal_dist = outs[0][-2]
                 j0_vals = outs[0][-1]
-                df_dyn = pd.DataFrame.from_dict(
-                    {'cost': cost_vals[1:], 'distance': avg_goal_dist[1:], 'j0': j0_vals[1:]})
-                df_dyn.to_csv(df_dyn_dir + 'dynamics.csv',
-                              mode='w', header=True, index=False)
+                df_dyn = pd.DataFrame.from_dict({'cost': cost_vals[1:], 'distance': avg_goal_dist[1:], 'j0': j0_vals[1:]})
+                df_dyn.to_csv(df_dyn_dir + 'dynamics.csv', mode='w', header=True, index=False)
 
             if do_statistics:
                 outs = np.array(
-                    [(*out[:-3], out[-3][-1], out[-2][-1], out[-1][-1]) for out in outs])
+                    [(*out[:-3], out[-3][-1], out[-2][-1], out[-1][-1]) for out in outs]
+                )
                 out_means = np.mean(outs, axis=0)
                 out_stds = np.std(outs, axis=0)
                 for key in exprt_keys:
@@ -246,6 +257,5 @@ if __name__ == '__main__':
                 df_res_dict['j0_val_STD'] = [(out_stds[6])]
 
                 df_res = pd.DataFrame.from_dict(df_res_dict)
-                df_res.to_csv(df_res_path, mode='a',
-                              header=df_res_header, index=False)
+                df_res.to_csv(df_res_path, mode='a', header=df_res_header, index=False)
                 df_res_header = False

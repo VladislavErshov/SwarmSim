@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.ticker as mticker
+import matplotlib.patches as patches
 import numpy as np
-
-
 
 rename = {
     'n_steps': 'number of max time steps',
@@ -61,32 +60,47 @@ def system_state(mas, goal_state, avg_goal_dist, cost_val, show=False, save_path
         avg_goal_dist:  Distance from agents to the goal (averaged)
         cost_val:       Cost functional value
     """
-    fstate = mas.agent_states
-    cluster_states = mas.cluster_states
-    n_clusters = mas.n_clusters
-    clust_labels = mas.clust_labels
     fig, ax = plt.subplots(figsize=(4, 4), dpi=140)
+
+    # Plot goal
     ax.scatter(goal_state[0], goal_state[1], s=30, c='k', marker='x')
+
+    # Plot obstacles
+    for obstacle in mas.obstacles:
+        circle = patches.Circle(obstacle['center'], radius=obstacle['radius'], edgecolor='black', facecolor='brown', fill=True)
+        ax.add_patch(circle)
+
+    n_clusters = mas.n_clusters
     colors = cm.rainbow(np.linspace(0, 1, n_clusters))
+
+    # Plot agents
+    f_state = mas.agent_states
+    clust_labels = mas.clust_labels
     for cdx in range(n_clusters):
         agent_indices = np.where(clust_labels == cdx)[0]
-        ax.scatter(fstate[agent_indices, 0], fstate[agent_indices, 1], 
-                    s=5, c=colors[cdx], marker='.')
-        ax.scatter(cluster_states[cdx][0], cluster_states[cdx][1], 
-                    s=40, facecolors='none', edgecolors='#000000', marker='o')
+        ax.scatter(f_state[agent_indices, 0], f_state[agent_indices, 1], s=5, c=colors[cdx], marker='.')
+
+    # Plot cluster centers
+    cluster_states = mas.cluster_states
+    for cdx in range(n_clusters):
+        ax.scatter(cluster_states[cdx][0], cluster_states[cdx][1], s=40, facecolors='none', edgecolors='#000000', marker='o')
+
     ax.set_title(f"Avg goal dist: {avg_goal_dist[-1]:.2}; cost: {cost_val:.2f}")
     ax.set_xlim(-5, goal_state[0] * 1.2)
     ax.set_ylim(-10, 10)
+
     if show:
         plt.show() 
     if save_path is not None:
         plt.savefig(save_path)
 
 
-def exprt_results(dfs_perstrat, param_col, xvalues, 
-                  mean_cols, std_cols, 
-                  xscale='log', yscale='log', xlogbase=10, ylogbase=10, 
-                  save_dir=None):
+def exprt_results(
+    dfs_perstrat, param_col, xvalues,
+    mean_cols, std_cols,
+    xscale='log', yscale='log', xlogbase=10, ylogbase=10,
+    save_dir=None
+):
     #colors = cm.rainbow(np.linspace(0, 1, len(list(dfs_perstrat.keys()))))
     plt.rcParams.update({'font.size': 14})
     for means, stds in zip(mean_cols, std_cols):
@@ -126,9 +140,7 @@ def exprt_dynamics(data, nd, info_string, info_string_simple, save_dir):
         #colors = cm.rainbow(np.linspace(0, 1, len(list(subdat.keys()))))
         fig, ax = plt.subplots(figsize=(6, 2), dpi=140)
         for sdx, (strat, ssdat) in enumerate(subdat.items()):
-            ax.plot(x[3:], ssdat[3:], 
-                    c=colors[strat], linewidth=1,
-                    label=rename[strat])
+            ax.plot(x[3:], ssdat[3:], c=colors[strat], linewidth=1, label=rename[strat])
         ax.grid('major')
         ax.tick_params(axis='both', which='major', labelsize=10)
         ax.set_title(rename[ftr] + ', ' + info_string)
