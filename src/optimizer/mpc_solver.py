@@ -61,7 +61,8 @@ def microcoupling_solve(
     L=None, L_lambda=1.0,
     u_max=None, u_min=None,
     x_min=None, x_max=None,
-    x_star_in=None, coll_d=None
+    x_star_in=None, coll_d=None,
+    obstacles=None
 ):
     """
     Solve a micro-scale problem with coupling 
@@ -91,6 +92,7 @@ def microcoupling_solve(
         constraints += create_state_update_equation_constraint(A, B, t, u, x)
         constraints += create_max_min_state_constraints(t, x, x_max, x_min)
         constraints += create_min_distance_constraints(a_dim, coll_d, nx, t, x)
+        constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles)
 
     if x_star_in is not None:
         cost += 0.5 * cvxpy.quad_form(x[:, N_mic] - x_star, P)  # terminal cost
@@ -120,7 +122,8 @@ def mesocoupling_solve(
     A_cpl, B_cpl, N_cpl, x0_cpl, L=None, L_lambda=1.,
     u_max_mes=None, u_min_mes=None, u_max_cpl=None, u_min_cpl=None,
     x_min_mes=None, x_max_mes=None, x_min_cpl=None, x_max_cpl=None,
-    x_star_in=None, coll_d=None
+    x_star_in=None, coll_d=None,
+    obstacles=None
 ):
     """Solve a meso-scale problem with coupling."""
     (nx_mes, nu_mes) = B_mes.shape
@@ -169,6 +172,7 @@ def mesocoupling_solve(
             constraints += create_state_update_equation_constraint(A_cpl, B_cpl, t, u_cpl, x_cpl)
             constraints += create_max_min_state_constraints(t, x_cpl, x_max_cpl, x_min_cpl)
             constraints += create_min_distance_constraints(a_dim, coll_d, nx_cpl, t, x_cpl)
+            constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx_cpl, t, x_cpl, obstacles)
 
         constraints += create_input_constraints(u_cpl, u_max_cpl, u_min_cpl)
         constraints += create_initial_state_constraint(x_cpl, x0_cpl)

@@ -386,6 +386,7 @@ class MultiAgentSystem:
             lap_mat_aug, lap_lambda,
             x_star_in=goal, coll_d=self.coll_d,
             u_max=umax, u_min=umin,
+            obstacles=self.obstacles
         )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0
@@ -478,6 +479,7 @@ class MultiAgentSystem:
             x_star_in=goal, coll_d=self.coll_d,
             u_max_mes=umax_mes, u_min_mes=umin_mes,
             u_max_cpl=umax_cpl, u_min_cpl=umin_cpl,
+            obstacles=self.obstacles
         )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0

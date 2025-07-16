@@ -157,7 +157,7 @@ if __name__ == '__main__':
     for config_name in configs:
         with open(f'cfg/{config_name}.yaml') as f:
             experiment_parameters = yaml.load(f, Loader=yaml.FullLoader)
-        exprts = list(product_dict(**experiment_parameters))
+        experiments = list(product_dict(**experiment_parameters))
 
         if PYPAPI_SPEC is not None:
             print("OP count enabled")
@@ -174,8 +174,8 @@ if __name__ == '__main__':
         else:
             df_res_header = True
 
-        exprt_keys = exprts[0].keys()
-        df_res_dict = {key: [] for key in exprt_keys} | {
+        experiment_keys = experiments[0].keys()
+        df_res_dict = {key: [] for key in experiment_keys} | {
             'cvx_time_MEAN': [],
             'cvx_time_STD': [],
             'cvx_time_nocoup_MEAN': [],
@@ -205,9 +205,9 @@ if __name__ == '__main__':
         #    df_cost = pd.DataFrame.from_dict({'microcoup': cost_microcoup, 'mesocoup': cost_mesocoup})
         #    df_cost.to_csv(df_cost_path, mode='w', header=True, index=False)
 
-        for exprt in exprts:
-            print(exprt)
-            e_str = str(exprt)
+        for experiment in experiments:
+            print(experiment)
+            e_str = str(experiment)
             e_str = e_str.translate(translation_table).replace(' ', '_')
             outs = []
             np.random.seed(rnd_seed)
@@ -218,11 +218,11 @@ if __name__ == '__main__':
             else:
                 df_dyn_dir = None
             if do_mp:
-                exprt_list = [exprt for _ in range(n_exper_runs - 1)] + [exprt | {'dynamics_pic_dir': df_dyn_dir}]
-                outs = mp_kwargs_wrapper(linear_mpc, exprt_list)
+                experiment_list = [experiment for _ in range(n_exper_runs - 1)] + [experiment | {'dynamics_pic_dir': df_dyn_dir}]
+                outs = mp_kwargs_wrapper(linear_mpc, experiment_list)
             else:
                 for edx in range(n_exper_runs):
-                    task_out = linear_mpc(**exprt, dynamics_pic_dir=df_dyn_dir)
+                    task_out = linear_mpc(**experiment, dynamics_pic_dir=df_dyn_dir)
                     outs.append(task_out)
 
             if do_dynamics:
@@ -238,8 +238,8 @@ if __name__ == '__main__':
                 )
                 out_means = np.mean(outs, axis=0)
                 out_stds = np.std(outs, axis=0)
-                for key in exprt_keys:
-                    df_res_dict[key] = [exprt[key]]
+                for key in experiment_keys:
+                    df_res_dict[key] = [experiment[key]]
 
                 df_res_dict['cvx_time_MEAN'] = [out_means[0]]
                 df_res_dict['cvx_time_STD'] = [(out_stds[0])]
