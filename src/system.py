@@ -485,7 +485,7 @@ class MultiAgentSystem:
         self.cvx_time += time_1 - time_0
 
         x0_true = self.agent_states.flatten()
-        goal_true = np.kron(np.ones((self.n_agents)), self.system_goal)
+        goal_true = np.kron(np.ones(self.n_agents), self.system_goal)
         m = np.zeros((self.n_agents, self.n_clusters))
         for i in range(self.n_agents):
             alpha = self.clust_labels[i]
@@ -495,7 +495,17 @@ class MultiAgentSystem:
         q_true = np.kron(np.eye(self.n_agents), Q)
         r_true = R_mes
         p_true = np.kron(np.eye(self.n_agents), P)
-        true_cost = _true_cost(x0_true, goal_true, a_true, b_true, u_mes.T, q_true, r_true, p_true, n_t_mes)
+        true_cost = _true_cost(
+            x0_true,
+            goal_true,
+            a_true,
+            b_true,
+            u_mes.T,
+            q_true,
+            r_true,
+            p_true,
+            n_t_mes
+        )
 
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0

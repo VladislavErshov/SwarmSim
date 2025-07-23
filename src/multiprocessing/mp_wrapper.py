@@ -1,21 +1,19 @@
 import multiprocessing as mp
 
 
-
 def worker_wrapper(arg):
     worker, kwargs = arg
     return worker(**kwargs)
 
 
 def mp_kwargs_wrapper(worker, kwargs_list):
-    pool=mp.Pool()
+    pool = mp.Pool()
     arg = [(worker, kwargs) for kwargs in kwargs_list]
-    result = pool.map(worker_wrapper, arg)
-    return result
+    return pool.map(worker_wrapper, arg)
 
 
 def sample_worker(a=1, b=2, c=3):
-    return a*b*c
+    return a * b * c
 
 
 if __name__ == "__main__":    

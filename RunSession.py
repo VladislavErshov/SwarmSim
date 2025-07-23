@@ -35,8 +35,7 @@ else:
 
 def linear_mpc(
     n_agents=1000,  # number of agents
-    # coordinates of initial cluster centroids for each cluster
-    cluster_means=[(0, 5), (0, -5)],
+    cluster_means=[(0, 5), (0, -5)], # coordinates of initial cluster centroids for each cluster
     cluster_std=0.8,  # standard deviation for gaussian blob cluster initialization
     cluster_rad=1,  # radius for uniform blob cluster initialization
     clust_eps=1.5,  # epsilon-delta clustering parameter epsilon
@@ -44,7 +43,7 @@ def linear_mpc(
     control_dim=2,  # diemnsionality of control
     goal_state=np.array([10, 0]),  # goal point coordinates
     A=np.eye(2),  # initial matrix A (state transition) for a linear agent
-    B=np.eye(2, 2),  # initial matrix B (control transition) for a linear agent
+    B=np.eye(2),  # initial matrix B (control transition) for a linear agent
     u_bound=None,  # control constraint absolute value
     n_steps=None,  # number of MPC iterations
     mpc_n_t=16,  # MPC horizon
@@ -53,10 +52,8 @@ def linear_mpc(
     lap_lambda=1.,  # coupling weight
     coll_d=None,
     control_strategy='mesocoup',  # control strategy
-    # None if prefer not to save dynamics plots, path to the save directory otherwise
-    dynamics_pic_dir=None,
-    # 'True' if shrink MPC horizon to the number of remaining MPC iterations
-    shrink_horizon=False,
+    dynamics_pic_dir=None, # None if prefer not to save dynamics plots, path to the save directory otherwise
+    shrink_horizon=False, # 'True' if shrink MPC horizon to the number of remaining MPC iterations
     do_coupling=True,  # 'True' if compute coupling at the start of optimization
 ):
     if mpc_n_t2 is None:
@@ -73,10 +70,14 @@ def linear_mpc(
     umax_cpl = 1
     umin_cpl = -1
     mas = MultiAgentSystem(
-        n_agents, agent_dim, control_dim, goal_state,
+        n_agents,
+        agent_dim,
+        control_dim,
+        goal_state,
         state_gen=gen.random_blobs,
         state_gen_args=[[A], [B], cluster_means, cluster_std],
-        clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d
+        clust_algo_params=[clust_eps, clust_eps],
+        coll_d=coll_d
     )
     mas.do_coupling = do_coupling
     avg_goal_dist = mas.avg_goal_dist
