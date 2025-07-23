@@ -44,7 +44,9 @@ def linear_mpc(
     control_dim=2,  # diemnsionality of control
     goal_state=np.array([10, 0]),  # goal point coordinates
     A=np.eye(2),  # initial matrix A (state transition) for a linear agent
-    B=np.eye(2, 2),  # initial matrix B (control transition) for a linear agent
+    B=np.eye(2),  # initial matrix B (control transition) for a linear agent
+    C=np.eye(2),
+    v=np.ones(2),
     u_bound=None,  # control constraint absolute value
     n_steps=None,  # number of MPC iterations
     mpc_n_t=16,  # MPC horizon
@@ -73,11 +75,16 @@ def linear_mpc(
     umin = -u_bound
     umax_cpl = 1
     umin_cpl = -1
-    mas = MultiAgentSystem(n_agents, agent_dim, control_dim, goal_state,
-                           state_gen=gen.random_blobs,
-                           state_gen_args=[
-                               [A], [B], cluster_means, cluster_std],
-                           clust_algo_params=[clust_eps, clust_eps], coll_d=coll_d)
+    mas = MultiAgentSystem(
+        n_agents,
+        agent_dim,
+        control_dim,
+        goal_state,
+        state_gen=gen.random_blobs,
+        state_gen_args=[[A], [B], [C], [v], cluster_means, cluster_std],
+        clust_algo_params=[clust_eps, clust_eps],
+        coll_d=coll_d
+    )
     mas.do_coupling = do_coupling
     avg_goal_dist = mas.avg_goal_dist
     cost_vals = [np.inf]

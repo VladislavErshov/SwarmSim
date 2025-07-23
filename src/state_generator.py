@@ -3,24 +3,36 @@ from sklearn.datasets import make_blobs
 
 
 
-def _make_agents(agent_class, agent_dim, n_agents, As, Bs, states):
+def _make_agents(agent_class, agent_dim, n_agents, As, Bs, Cs, vs, states):
     agents = {}
     for idx in range(n_agents):
         if len(As) == n_agents:
             A = As[idx]
             B = Bs[idx]
+            C = Cs[idx]
+            v = vs[idx]
         elif len(As) == 1:
             A = As[0]
             B = Bs[0]
+            C = Cs[0]
+            v = vs[0]
         else:
-            raise ValueError("The number of A's and B's should be equal to n_agents OR equal to 1")
-        agents[idx] = agent_class(A, B, agent_dim, states[idx])
+            raise ValueError("The number of A's, B's, C's and v's should be equal to n_agents OR equal to 1")
+        agents[idx] = agent_class(A, B, C, v, agent_dim, states[idx])
+
     return agents
 
 
-def strict(agent_class, agent_dim=1, n_agents=1, 
-           As=[1], Bs=[1], 
-           x0s=[[0,]]):
+def strict(
+    agent_class,
+    agent_dim=1,
+    n_agents=1,
+    As=[1],
+    Bs=[1],
+    Cs=[1],
+    vs=[1],
+    x0s=[[0, ]]
+):
     """
     Set initial agent states by state values provided in the arguments.
     
@@ -40,14 +52,25 @@ def strict(agent_class, agent_dim=1, n_agents=1,
     assert n_agents == np.array(x0s).shape[0]
     assert agent_dim == np.array(x0s).shape[1]
     assert len(As) == len(Bs)
+    assert len(As) == len(Cs)
+    assert len(As) == len(vs)
+
     states = np.array(x0s)
-    agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
-    return agents
+
+    return _make_agents(agent_class, agent_dim, n_agents, As, Bs, Cs, vs, states)
 
 
-def random_blobs(agent_class, agent_dim=1, n_agents=1, 
-                 As=[1], Bs=[1], 
-                 cluster_data=1, cluster_std=1):
+def random_blobs(
+    agent_class,
+    agent_dim=1,
+    n_agents=1,
+    As=[1],
+    Bs=[1],
+    Cs=[1],
+    vs=[1],
+    cluster_data=1,
+    cluster_std=1
+):
     """
     Set initial agent states by randomized gaussian blobs
     parametrized by cluster centroids and standard deviation.
@@ -67,16 +90,31 @@ def random_blobs(agent_class, agent_dim=1, n_agents=1,
     Returns:
         agents:             Dictionary of agent objects
     """
-    assert len(As) == len(Bs)   
-    states = make_blobs(n_samples=n_agents, n_features=agent_dim, 
-                        centers=cluster_data, cluster_std=cluster_std)[0]
-    agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
-    return agents
+    assert len(As) == len(Bs)
+    assert len(As) == len(Cs)
+    assert len(As) == len(vs)
+
+    states = make_blobs(
+        n_samples=n_agents,
+        n_features=agent_dim,
+        centers=cluster_data,
+        cluster_std=cluster_std
+    )[0]
+
+    return _make_agents(agent_class, agent_dim, n_agents, As, Bs, Cs, vs, states)
 
 
-def uni_ball(agent_class, agent_dim=1, n_agents=1, 
-             As=[1], Bs=[1], 
-             cluster_data=[(0, 0)], cluster_rad=1):
+def uni_ball(
+    agent_class,
+    agent_dim=1,
+    n_agents=1,
+    As=[1],
+    Bs=[1],
+    Cs=[1],
+    vs=[1],
+    cluster_data=[(0, 0)],
+    cluster_rad=1
+):
     """
     Set initial agent states by randomized uniform blobs 
     parametrized by cluster centroids and a radius.
@@ -95,14 +133,17 @@ def uni_ball(agent_class, agent_dim=1, n_agents=1,
     Returns:
         agents:             Dictionary of agent objects
     """
-    assert len(As) == len(Bs) 
-    n_ag_percluster = n_agents // len(cluster_data)
+    assert len(As) == len(Bs)
+    assert len(As) == len(Cs)
+    assert len(As) == len(vs)
+
+    n_ag_per_cluster = n_agents // len(cluster_data)
     states = np.zeros((n_agents, agent_dim))
     for cdx, centroid in enumerate(cluster_data):
         r = np.sqrt(np.random.uniform(0, cluster_rad, n_ag_percluster))
         a = np.pi * np.random.uniform(0, 2, n_ag_percluster)
         xy = np.array([r * np.cos(a), r * np.sin(a)]).T
         xy += centroid
-        states[cdx*n_ag_percluster:(cdx+1)*n_ag_percluster, :] = xy
-    agents = _make_agents(agent_class, agent_dim, n_agents, As, Bs, states)
-    return agents
+        states[cdx*n_ag_per_cluster:(cdx+1)*n_ag_per_cluster, :] = xy
+
+    return _make_agents(agent_class, agent_dim, n_agents, As, Bs, Cs, vs, states)

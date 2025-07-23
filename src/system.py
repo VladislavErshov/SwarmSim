@@ -10,36 +10,51 @@ from src.optimizer import mpc_solver
 
 
 # Find if performance counter module exists
-PYPAPI_SPEC = importlib.util.find_spec('pypapi')
-if PYPAPI_SPEC is not None:
-    # pypapi = importlib.util.module_from_spec(PYPAPI_SPEC)
-    from pypapi import events as papi_events, papi_high
-    try:
-        papi_high.start_counters([papi_events.PAPI_FP_OPS,])
-    except:
-        PYPAPI_SPEC = None
+# PYPAPI_SPEC = importlib.util.find_spec('pypapi')
+# if PYPAPI_SPEC is not None:
+#     # pypapi = importlib.util.module_from_spec(PYPAPI_SPEC)
+#     from pypapi import events as papi_events, papi_high
+#     try:
+#         papi_high.start_counters([papi_events.PAPI_FP_OPS,])
+#     except:
+#         PYPAPI_SPEC = None
+papi_events, papi_high = None, None
+PYPAPI_SPEC = None
 
 
-def _lin_sys(x, A, u, B):
-    return A @ x + B @ u
+def _lin_sys(x, A, u, B, C, v):
+    # y = x
+    # y = C @ x
+    y = C @ x + v
+    return A @ y + B @ u
 
 
-def _true_cost(x0, goal, A, B, u_seq, Q, R, P, T):
+def _true_cost(x0, goal, A, B, C, v, u_seq, Q, R, P, T):
     cost = 0
     x = x0
     for t in range(T):
         cost += (x - goal) @ Q @ (x - goal) + u_seq[t] @ R @ u_seq[t]
-        x = _lin_sys(x, A, u_seq[t], B)
+        x = _lin_sys(x, A, u_seq[t], B, C, v)
     cost += (x - goal) @ P @ (x - goal)
+
     return cost
 
 
 class MultiAgentSystem():
     """A multi-agent system dynamics simulator."""
 
-    def __init__(self, n_agents=1, agent_dim=1, control_dim=1, global_goal=np.array([0]),
-                 state_gen=gen.random_blobs, state_gen_args=[1, 1, 1, 1],
-                 clust_algo='epsdel', clust_algo_params=[1, 1], coll_d=None) -> None:
+    def __init__(
+        self,
+        n_agents=1,
+        agent_dim=1,
+        control_dim=1,
+        global_goal=np.array([0]),
+        state_gen=gen.random_blobs,
+        state_gen_args=[1, 1, 1, 1, 1, 1],
+        clust_algo='epsdel',
+        clust_algo_params=[1, 1],
+        coll_d=None
+    ) -> None:
         """
         Args:
             n_agents:               Number of agents
@@ -114,7 +129,7 @@ class MultiAgentSystem():
 
             self.n_clusters = max(self.clust_labels) + 1
             self.clusters = {}
-            self.cluster_n_agents = np.zeros((self.n_clusters))
+            self.cluster_n_agents = np.zeros(self.n_clusters)
             self.cluster_states = np.zeros((self.n_clusters, self.agent_dim))
             for cdx in range(self.n_clusters):
                 agent_indices = np.where(self.clust_labels == cdx)[0]
@@ -172,22 +187,26 @@ class MultiAgentSystem():
         for _, agent in self.agents.items():
             A = agent.A
             B = agent.B
+            C = agent.C
+            v = agent.v
             x0 = agent.state
-            state_dynamics, u_dynamics, cost_val_agnt = mpc_solver.conventional_solve(A, B, n_t,
-                                                                                      Q, R, P, x0, self.agent_dim,
-                                                                                      x_star_in=self.system_goal,
-                                                                                      coll_d=self.coll_d,
-                                                                                      umax=umax, umin=umin)
-            cost_val += cost_val_agnt
+            state_dynamics, u_dynamics, cost_val_agent = mpc_solver.conventional_solve(
+                A, B, C, v,
+                n_t, Q, R, P, x0, self.agent_dim,
+                u_max=umax, u_min=umin,
+                x_star_in=self.system_goal,
+                coll_d=self.coll_d,
+                obstacles=self.obstacles
+            )
+            cost_val += cost_val_agent
             # for tdx in range(n_t):
             #    agent.propagate_input(u_dynamics[:, tdx])
             agent.propagate_input(u_dynamics[:, 0])
             self._re_eval_system()
 
-        goal = np.kron(np.ones((self.n_agents)), self.system_goal)
+        goal = np.kron(np.ones(self.n_agents), self.system_goal)
         x0_true = self.agent_states.flatten()
-        true_cost = _true_cost(x0_true, goal, A, B,
-                               u_dynamics.T, Q, R, P, n_t)
+        true_cost = _true_cost(x0_true, goal, A, B, C, v, u_dynamics.T, Q, R, P, n_t)
 
         self.cvx_time += time.perf_counter() - time_0
         self.cvx_time_nocoup = self.cvx_time
@@ -215,32 +234,34 @@ class MultiAgentSystem():
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
-        A = np.zeros((self.agent_dim * self.n_agents,
-                     self.agent_dim * self.n_agents))
-        B = np.zeros((self.agent_dim * self.n_agents,
-                     self.control_dim * self.n_agents))
+        A = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        B = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
+        C = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        v = np.zeros((self.agent_dim * self.n_agents, 1))
         for adx, agent in self.agents.items():
-            A[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-              adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
-            B[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-              adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+            A[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
+            B[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+            C[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.C
+            v[adx * self.agent_dim: (adx + 1) * self.agent_dim, 0] = agent.v
         x0 = self.agent_states.flatten()
-        goal = np.kron(np.ones((self.n_agents)), self.system_goal)
+        goal = np.kron(np.ones(self.n_agents), self.system_goal)
         Q = np.kron(np.eye(self.n_agents), Q)
         R = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_agents), P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.perf_counter()
-        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t,
-                                                                             Q, R, P, x0, self.agent_dim,
-                                                                             x_star_in=goal,
-                                                                             coll_d=self.coll_d,
-                                                                             umax=umax, umin=umin)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(
+            A, B, C, v,
+            n_t, Q, R, P, x0, self.agent_dim,
+            u_max=umax, u_min=umin,
+            x_star_in=goal,
+            coll_d=self.coll_d,
+            obstacles=self.obstacles
+        )
 
         x0_true = self.agent_states.flatten()
-        true_cost = _true_cost(x0_true, goal, A, B,
-                               u_dynamics.T, Q, R, P, n_t)
+        true_cost = _true_cost(x0_true, goal, A, B, C, v, u_dynamics.T, Q, R, P, n_t)
 
         self.cvx_time += time.perf_counter() - time_0
         self.cvx_time_nocoup = self.cvx_time
@@ -272,17 +293,17 @@ class MultiAgentSystem():
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
-        A = np.zeros((self.agent_dim * self.n_clusters,
-                     self.agent_dim * self.n_clusters))
-        B = np.zeros((self.agent_dim * self.n_clusters,
-                     self.control_dim * self.n_clusters))
+        A = np.zeros((self.agent_dim * self.n_clusters, self.agent_dim * self.n_clusters))
+        B = np.zeros((self.agent_dim * self.n_clusters, self.control_dim * self.n_clusters))
+        C = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        v = np.zeros((self.agent_dim * self.n_agents, 1))
         for cdx, cluster in self.clusters.items():
-            A[cdx * self.agent_dim: (cdx + 1) * self.agent_dim,
-              cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.A
-            B[cdx * self.agent_dim: (cdx + 1) * self.agent_dim,
-              cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
+            A[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.A
+            B[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
+            C[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.C
+            v[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, 0] = cluster.v
         x0 = self.cluster_states.flatten()
-        goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
+        goal = np.kron(np.ones(self.n_clusters), self.system_goal)
         calpha_diag = np.diag(self.cluster_n_agents)
         Q = np.kron(calpha_diag, Q)
         R = np.kron(calpha_diag, R)
@@ -290,15 +311,17 @@ class MultiAgentSystem():
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.perf_counter()
-        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(A, B, n_t,
-                                                                             Q, R, P, x0, self.agent_dim,
-                                                                             x_star_in=goal,
-                                                                             coll_d=self.coll_d,
-                                                                             umax=umax, umin=umin)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.conventional_solve(
+            A, B, C, v,
+            n_t, Q, R, P, x0, self.agent_dim,
+            u_max=umax, u_min=umin,
+            x_star_in=goal,
+            coll_d=self.coll_d,
+            obstacles=self.obstacles
+        )
 
         x0_true = self.cluster_states.flatten()
-        true_cost = _true_cost(x0_true, goal, A, B,
-                               u_dynamics.T, Q, R, P, n_t)
+        true_cost = _true_cost(x0_true, goal, A, B, C, v, u_dynamics.T, Q, R, P, n_t)
 
         self.cvx_time += time.perf_counter() - time_0
         self.cvx_time_nocoup = self.cvx_time
@@ -344,45 +367,48 @@ class MultiAgentSystem():
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
-        A = np.zeros((self.agent_dim * self.n_agents,
-                     self.agent_dim * self.n_agents))
-        B = np.zeros((self.agent_dim * self.n_agents,
-                     self.control_dim * self.n_agents))
+        A = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        B = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
+        C = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        v = np.zeros((self.agent_dim * self.n_agents, 1))
         clust_rads = []
         if n_t_cpl is None:
             n_t_cpl = n_t_mic
         for adx, agent in self.agents.items():
-            A[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-              adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
-            B[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-              adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+            A[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
+            B[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+            C[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.C
+            v[adx * self.agent_dim: (adx + 1) * self.agent_dim, 0] = agent.v
         for cdx, cluster in self.clusters.items():
-            clust_rads.append(cluster.rad)
-        if (np.max(clust_rads) > rad_max) and (self.do_coupling):
-            lap_mat_aug = np.kron(self.laplacian, np.eye(
-                self.agent_dim)) / self.n_agents
+            clust_rads.append(cluster.radius)
+        if (np.max(clust_rads) > rad_max) and self.do_coupling:
+            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
         else:
             lap_mat_aug = None
             if turn_cpl_off:
                 self.do_coupling = False
         x0 = self.agent_states.flatten()
-        goal = np.kron(np.ones((self.n_agents)), self.system_goal)
+        goal = np.kron(np.ones(self.n_agents), self.system_goal)
         Q = np.kron(np.eye(self.n_agents), Q)
         R = np.kron(np.eye(self.n_agents), R)
         P = np.kron(np.eye(self.n_agents), P)
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.perf_counter()
-        state_dynamics, u_dynamics, cost_val = mpc_solver.microcoupling_solve(A, B, n_t_mic, Q, R, P, x0, self.agent_dim, n_t_cpl,
-                                                                              lap_mat_aug, lap_lambda,
-                                                                              x_star_in=goal, coll_d=self.coll_d,
-                                                                              umax=umax, umin=umin,)
+        state_dynamics, u_dynamics, cost_val = mpc_solver.microcoupling_solve(
+            A, B, C, v,
+            n_t_mic, Q, R, P, x0,
+            self.agent_dim, n_t_cpl,
+            lap_mat_aug, lap_lambda,
+            x_star_in=goal, coll_d=self.coll_d,
+            u_max=umax, u_min=umin,
+            obstacles=self.obstacles
+        )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0
 
         x0_true = self.agent_states.flatten()
-        true_cost = _true_cost(x0_true, goal, A, B,
-                               u_dynamics.T, Q, R, P, n_t_mic)
+        true_cost = _true_cost(x0_true, goal, A, B, C, v, u_dynamics.T, Q, R, P, n_t_mic)
 
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
@@ -433,29 +459,28 @@ class MultiAgentSystem():
             avg_goal_dist:      Average distances toward the goal point for all agents (list of all distances along the path)
             cost_val:           Value of the cost function at the final step        
         """
-        A_mes = np.zeros((self.agent_dim * self.n_clusters,
-                         self.agent_dim * self.n_clusters))
-        A_cpl = np.zeros((self.agent_dim * self.n_agents,
-                         self.agent_dim * self.n_agents))
-        B_mes = np.zeros((self.agent_dim * self.n_clusters,
-                         self.control_dim * self.n_clusters))
-        B_cpl = np.zeros((self.agent_dim * self.n_agents,
-                         self.control_dim * self.n_agents))
-        clust_rads = []
+        A_mes = np.zeros((self.agent_dim * self.n_clusters, self.agent_dim * self.n_clusters))
+        A_cpl = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        B_mes = np.zeros((self.agent_dim * self.n_clusters, self.control_dim * self.n_clusters))
+        B_cpl = np.zeros((self.agent_dim * self.n_agents, self.control_dim * self.n_agents))
+        C_mes = np.zeros((self.agent_dim * self.n_clusters, self.agent_dim * self.n_clusters))
+        C_cpl = np.zeros((self.agent_dim * self.n_agents, self.agent_dim * self.n_agents))
+        v_mes = np.zeros((self.agent_dim * self.n_clusters, 1))
+        v_cpl = np.zeros((self.agent_dim * self.n_agents, 1))
+        clust_radii = []
         for cdx, cluster in self.clusters.items():
-            A_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim,
-                  cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.A
-            B_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim,
-                  cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
-            clust_rads.append(cluster.rad)
+            A_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.A
+            B_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.control_dim: (cdx + 1) * self.control_dim] = cluster.B
+            C_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, cdx * self.agent_dim: (cdx + 1) * self.agent_dim] = cluster.C
+            v_mes[cdx * self.agent_dim: (cdx + 1) * self.agent_dim, 0] = cluster.v
+            clust_radii.append(cluster.radius)
         for adx, agent in self.agents.items():
-            A_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-                  adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
-            B_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim,
-                  adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
-        if (np.max(clust_rads) > rad_max) and (self.do_coupling):
-            lap_mat_aug = np.kron(self.laplacian, np.eye(
-                self.agent_dim)) / self.n_agents
+            A_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.A
+            B_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.control_dim: (adx + 1) * self.control_dim] = agent.B
+            C_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, adx * self.agent_dim: (adx + 1) * self.agent_dim] = agent.C
+            v_cpl[adx * self.agent_dim: (adx + 1) * self.agent_dim, 0] = agent.v
+        if np.max(clust_radii) > rad_max and self.do_coupling:
+            lap_mat_aug = np.kron(self.laplacian, np.eye(self.agent_dim)) / self.n_agents
             # lap_mat_aug = None
         else:
             lap_mat_aug = None
@@ -463,7 +488,7 @@ class MultiAgentSystem():
                 self.do_coupling = False
         x0_mes = self.cluster_states.flatten()
         x0_cpl = self.agent_states.flatten()
-        goal = np.kron(np.ones((self.n_clusters)), self.system_goal)
+        goal = np.kron(np.ones(self.n_clusters), self.system_goal)
         calpha_diag = np.diag(self.cluster_n_agents)
         Q_mes = np.kron(calpha_diag, Q)
         R_mes = np.kron(calpha_diag, R)
@@ -471,11 +496,16 @@ class MultiAgentSystem():
         if PYPAPI_SPEC and papi_events.PAPI_FP_OPS:
             papi_high.start_counters([papi_events.PAPI_FP_OPS,])
         time_0 = time.perf_counter()
-        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(A_mes, B_mes, n_t_mes, Q_mes, R_mes, P_mes, x0_mes, self.agent_dim,
-                                                                               A_cpl, B_cpl, n_t_cpl, x0_cpl, lap_mat_aug, lap_lambda,
-                                                                               x_star_in=goal, coll_d=self.coll_d,
-                                                                               umax_mes=umax_mes, umin_mes=umin_mes,
-                                                                               umax_cpl=umax_cpl, umin_cpl=umin_cpl,)
+        cl_dyn, ag_dyn, u_mes, u_cpl, cost_val = mpc_solver.mesocoupling_solve(
+            A_mes, B_mes, C_mes, v_mes,
+            n_t_mes, Q_mes, R_mes, P_mes, x0_mes, self.agent_dim,
+            A_cpl, B_cpl, C_cpl, v_cpl,
+            n_t_cpl, x0_cpl, lap_mat_aug, lap_lambda,
+            x_star_in=goal, coll_d=self.coll_d,
+            u_max_mes=umax_mes, u_min_mes=umin_mes,
+            u_max_cpl=umax_cpl, u_min_cpl=umin_cpl,
+            obstacles=self.obstacles
+        )
         time_1 = time.perf_counter()
         self.cvx_time += time_1 - time_0
 
@@ -487,11 +517,24 @@ class MultiAgentSystem():
             m[i, alpha] = 1
         b_true = B_cpl @ np.kron(m, np.eye(self.agent_dim))
         a_true = A_cpl
+        c_true = C_cpl
+        v_true = v_cpl
         q_true = np.kron(np.eye(self.n_agents), Q)
         r_true = R_mes
         p_true = np.kron(np.eye(self.n_agents), P)
-        true_cost = _true_cost(x0_true, goal_true, a_true, b_true,
-                               u_mes.T, q_true, r_true, p_true, n_t_mes)
+        true_cost = _true_cost(
+            x0_true,
+            goal_true,
+            a_true,
+            b_true,
+            c_true,
+            v_true,
+            u_mes.T,
+            q_true,
+            r_true,
+            p_true,
+            n_t_mes
+        )
 
         if lap_mat_aug is None:
             self.cvx_time_nocoup += time_1 - time_0
@@ -513,13 +556,15 @@ class MultiAgentSystem():
         return self.avg_goal_dist, cost_val, true_cost
 
 
-class LinearAgentNd():
-    """Linear agent with x[t+1] = Ax[t] + Bu[t] dynamics."""
+class LinearAgentNd:
+    """
+    Linear agent with
+        x[t+1] = Ax[t] + Bu[t]
+        y[t+1] = Cx[t] + v
+    dynamics.
+    """
 
-    def __init__(self,
-                 A, B,
-                 agent_dim=1,
-                 init_state=np.zeros((1))) -> None:
+    def __init__(self, A, B, C, v, agent_dim=1, init_state=np.zeros((1))) -> None:
         """
         Args:
             A, B:           State and control transition matrices
@@ -529,8 +574,8 @@ class LinearAgentNd():
         assert init_state.size == agent_dim
         self.A = A
         self.B = B
-        assert A.shape == (agent_dim, agent_dim)
-        assert B.shape[1] == agent_dim
+        self.C = C
+        self.v = v
         self.state = init_state
         self.agent_dim = agent_dim
 
@@ -565,11 +610,17 @@ class LinearClusterNd():
         self.update_state()
         self.A = 0.
         self.B = 0.
+        self.C = 0.
+        self.v = 0.
         for agent in self.agents.values():
             self.A += agent.A
             self.B += agent.B
+            self.C += agent.C
+            self.v += agent.v
         self.A /= self.n_agents
         self.B /= self.n_agents
+        self.C /= self.n_agents
+        self.v /= self.n_agents
 
     def propagate_input(self, control_val):
         """Propagate a meso-scale control action for all agents within the cluster."""

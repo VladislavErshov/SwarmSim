@@ -5,11 +5,14 @@ import cvxpy
 from cvxpy.atoms.affine.wraps import psd_wrap
 
 
-
-def conventional_solve(A, B, N, Q, R, P, x0, adim,
-                       umax=None, umin=None, 
-                       xmin=None, xmax=None,
-                       x_star_in=None, coll_d=None):
+def conventional_solve(
+    A, B, C, v,
+    N, Q, R, P, x0, a_dim,
+    u_max=None, u_min=None,
+    x_min=None, x_max=None,
+    x_star_in=None, coll_d=None,
+    obstacles=None
+):
     """
     Solve a multi-agent MPC problem [TODO: with collision avoidance]
     """
@@ -23,7 +26,7 @@ def conventional_solve(A, B, N, Q, R, P, x0, adim,
     u = cvxpy.Variable((nu, N))
 
     costlist = 0.0
-    constrlist = []
+    constraints = []
 
     for t in range(N):
         if x_star_in is not None:
@@ -33,47 +36,43 @@ def conventional_solve(A, B, N, Q, R, P, x0, adim,
             costlist += 0.5 * cvxpy.quad_form(x[:, t], Q)
         costlist += 0.5 * cvxpy.quad_form(u[:, t], R)
 
-        constrlist += [x[:, t + 1] == A * x[:, t] + B * u[:, t]]
-
-        if xmin is not None:
-            constrlist += [x[:, t] >= xmin[:, 0]]
-        if xmax is not None:
-            constrlist += [x[:, t] <= xmax[:, 0]]
-
-        # TODO: make convex
-        if coll_d is not None:
-            for idx in range(nx//adim):
-                for jdx in range(idx+1, nx//adim):
-                    constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+        constraints += create_state_update_equation_constraint(A, B, C, v, t, u, x)
+        constraints += create_max_min_state_constraints(t, x, x_max, x_min)
+        constraints += create_min_distance_constraints(a_dim, coll_d, nx, t, x)
+        constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles)
 
     if x_star_in is not None:
         costlist += 0.5 * cvxpy.quad_form(x[:, N] - x_star, P)  # terminal cost
     else:
         costlist += 0.5 * cvxpy.quad_form(x[:, N], P)
-    if xmin is not None:
-        constrlist += [x[:, N] >= xmin[:, 0]]
-    if xmax is not None:
-        constrlist += [x[:, N] <= xmax[:, 0]]
+    if x_min is not None:
+        constraints += [x[:, N] >= x_min[:, 0]]
+    if x_max is not None:
+        constraints += [x[:, N] <= x_max[:, 0]]
 
-    if umax is not None:
-        constrlist += [u <= umax]  # input constraints
-    if umin is not None:
-        constrlist += [u >= umin]  # input constraints
+    if u_max is not None:
+        constraints += [u <= u_max]  # input constraints
+    if u_min is not None:
+        constraints += [u >= u_min]  # input constraints
 
-    constrlist += [x[:, 0] == x0]  # inital state constraints
+    constraints += [x[:, 0] == x0]  # initial state constraints
 
-    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
+    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constraints)
     prob.solve(verbose=False)
     cost_val = prob.value
 
     return x.value, u.value, cost_val
 
 
-def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
-                        L=None, L_lambda=1., 
-                        umax=None, umin=None,
-                        xmin=None, xmax=None,
-                        x_star_in=None, coll_d=None):
+def microcoupling_solve(
+    A, B, C, v,
+    N_mic, Q, R, P, x0, a_dim, N_cpl,
+    L=None, L_lambda=1.0,
+    u_max=None, u_min=None,
+    x_min=None, x_max=None,
+    x_star_in=None, coll_d=None,
+    obstacles=None
+):
     """
     Solve a micro-scale problem with coupling 
     """
@@ -88,7 +87,7 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
     u = cvxpy.Variable((nu, N_mic))
 
     costlist = 0.0
-    constrlist = []
+    constraints = []
 
     # Slow-time meso-scale problem
     for t in range(N_mic):
@@ -99,34 +98,26 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
             costlist += 0.5 * cvxpy.quad_form(x[:, t], Q)
         #costlist += 0.5 * cvxpy.quad_form(u[:, t], R)
 
-        constrlist += [x[:, t + 1] == A * x[:, t] + B * u[:, t]]
-
-        if xmin is not None:
-            constrlist += [x[:, t] >= xmin[:, 0]]
-        if xmax is not None:
-            constrlist += [x[:, t] <= xmax[:, 0]]
-
-        # TODO: make convex
-        if coll_d is not None:
-            for idx in range(nx//adim):
-                for jdx in range(idx+1, nx//adim - 1):
-                    constrlist += [cvxpy.norm1(x[idx * adim : (idx+1) * adim, t] - x[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+        constraints += create_state_update_equation_constraint(A, B, C, v, t, u, x)
+        constraints += create_max_min_state_constraints(t, x, x_max, x_min)
+        constraints += create_min_distance_constraints(a_dim, coll_d, nx, t, x)
+        constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles)
 
     if x_star_in is not None:
         costlist += 0.5 * cvxpy.quad_form(x[:, N_mic] - x_star, P)  # terminal cost
     else:
         costlist += 0.5 * cvxpy.quad_form(x[:, N_mic], P)
-    if xmin is not None:
-        constrlist += [x[:, N_mic] >= xmin[:, 0]]
-    if xmax is not None:
-        constrlist += [x[:, N_mic] <= xmax[:, 0]]
+    if x_min is not None:
+        constraints += [x[:, N_mic] >= x_min[:, 0]]
+    if x_max is not None:
+        constraints += [x[:, N_mic] <= x_max[:, 0]]
 
-    if umax is not None:
-        constrlist += [u <= umax]  # input constraints
-    if umin is not None:
-        constrlist += [u >= umin]  # input constraints
+    if u_max is not None:
+        constraints += [u <= u_max]  # input constraints
+    if u_min is not None:
+        constraints += [u >= u_min]  # input constraints
 
-    constrlist += [x[:, 0] == x0]  # inital state constraints
+    constraints += [x[:, 0] == x0]  # inital state constraints
 
     # Coupling problem
     if L is not None:
@@ -135,21 +126,24 @@ def microcoupling_solve(A, B, N_mic, Q, R, P, x0, adim, N_cpl,
             costlist += 0.5 * L_lambda * cvxpy.quad_form(x[:, t], L)
 
     # Solve 
-    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
+    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constraints)
     prob.solve(verbose=False)
     cost_val = prob.value
 
     return x.value, u.value, cost_val
 
 
-def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R, P, x0_mes, adim,
-                       A_cpl, B_cpl, N_cpl, x0_cpl, L=None, L_lambda=1., 
-                       umax_mes=None, umin_mes=None, umax_cpl=None, umin_cpl=None,
-                       xmin_mes=None, xmax_mes=None, xmin_cpl=None, xmax_cpl=None,
-                       x_star_in=None, coll_d=None):
-    """
-    Solve a meso-scale problem with coupling
-    """
+def mesocoupling_solve(
+    A_mes, B_mes, C_mes, v_mes,
+    N_mes, Q, R, P, x0_mes, a_dim,
+    A_cpl, B_cpl, C_cpl, v_cpl,
+    N_cpl, x0_cpl, L=None, L_lambda=1.,
+    u_max_mes=None, u_min_mes=None, u_max_cpl=None, u_min_cpl=None,
+    x_min_mes=None, x_max_mes=None, x_min_cpl=None, x_max_cpl=None,
+    x_star_in=None, coll_d=None,
+    obstacles=None
+):
+    """Solve a meso-scale problem with coupling."""
     (nx_mes, nu_mes) = B_mes.shape
     (nx_cpl, nu_cpl) = B_cpl.shape
     
@@ -164,7 +158,7 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R, P, x0_mes, adim,
     u_cpl = cvxpy.Variable((nu_cpl, N_cpl))
 
     costlist = 0.0
-    constrlist = []
+    constraints = []
 
     # Slow-time meso-scale problem
     for t in range(N_mes):
@@ -175,28 +169,24 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R, P, x0_mes, adim,
             costlist += 0.5 * cvxpy.quad_form(x_mes[:, t], Q)
         costlist += 0.5 * cvxpy.quad_form(u_mes[:, t], R)
 
-        constrlist += [x_mes[:, t + 1] == A_mes * x_mes[:, t] + B_mes * u_mes[:, t]]
-
-        if xmin_mes is not None:
-            constrlist += [x_mes[:, t] >= xmin_mes[:, 0]]
-        if xmax_mes is not None:
-            constrlist += [x_mes[:, t] <= xmax_mes[:, 0]]
+        constraints += create_state_update_equation_constraint(A_mes, B_mes, C_mes, v_mes, t, u_mes, x_mes)
+        constraints += create_max_min_state_constraints(t, x_mes, x_max_mes, x_min_mes)
 
     if x_star_in is not None:
         costlist += 0.5 * cvxpy.quad_form(x_mes[:, N_mes] - x_star, P)  # terminal cost
     else:
         costlist += 0.5 * cvxpy.quad_form(x_mes[:, N_mes], P) 
-    if xmin_mes is not None:
-        constrlist += [x_mes[:, N_mes] >= xmin_mes[:, 0]]
-    if xmax_mes is not None:
-        constrlist += [x_mes[:, N_mes] <= xmax_mes[:, 0]]
+    if x_min_mes is not None:
+        constraints += [x_mes[:, N_mes] >= x_min_mes[:, 0]]
+    if x_max_mes is not None:
+        constraints += [x_mes[:, N_mes] <= x_max_mes[:, 0]]
 
-    if umax_mes is not None:
-        constrlist += [u_mes <= umax_mes]  # input constraints
-    if umin_mes is not None:
-        constrlist += [u_mes >= umin_mes]  # input constraints
+    if u_max_mes is not None:
+        constraints += [u_mes <= u_max_mes]  # input constraints
+    if u_min_mes is not None:
+        constraints += [u_mes >= u_min_mes]  # input constraints
 
-    constrlist += [x_mes[:, 0] == x0_mes]  # inital state constraints
+    constraints += [x_mes[:, 0] == x0_mes]  # inital state constraints
 
     # Fast-time micro-scale problem
     if L is not None:
@@ -204,30 +194,107 @@ def mesocoupling_solve(A_mes, B_mes, N_mes, Q, R, P, x0_mes, adim,
         for t in range(N_cpl):
             costlist += 0.5 * L_lambda * cvxpy.quad_form(x_cpl[:, t], L)
 
-            constrlist += [x_cpl[:, t + 1] == A_cpl * x_cpl[:, t] + B_cpl * u_cpl[:, t]]
+            constraints += create_state_update_equation_constraint(A_cpl, B_cpl, C_cpl, v_cpl, t, u_cpl, x_cpl)
+            constraints += create_max_min_state_constraints(t, x_cpl, x_max_cpl, x_min_cpl)
+            constraints += create_min_distance_constraints(a_dim, coll_d, nx_cpl, t, x_cpl)
+            constraints += create_avoid_obstacle_constraints(a_dim, coll_d, nx_cpl, t, x_cpl, obstacles)
 
-            if xmin_cpl is not None:
-                constrlist += [x_cpl[:, t] >= xmin_cpl[:, 0]]
-            if xmax_cpl is not None:
-                constrlist += [x_cpl[:, t] <= xmax_cpl[:, 0]]
+            if x_min_cpl is not None:
+                constraints += [x_cpl[:, t] >= x_min_cpl[:, 0]]
+            if x_max_cpl is not None:
+                constraints += [x_cpl[:, t] <= x_max_cpl[:, 0]]
 
             # TODO: make convex
             if coll_d is not None:
-                for idx in range(nx_cpl//adim):
-                    for jdx in range(idx+1, nx_cpl//adim - 1):
-                        constrlist += [cvxpy.norm1(x_cpl[idx * adim : (idx+1) * adim, t] - x_cpl[jdx * adim : (jdx+1) * adim, t]) >= coll_d]
+                for idx in range(nx_cpl//a_dim):
+                    for jdx in range(idx+1, nx_cpl//a_dim - 1):
+                        constraints += [cvxpy.norm1(x_cpl[idx * a_dim : (idx+1) * a_dim, t] - x_cpl[jdx * a_dim : (jdx+1) * a_dim, t]) >= coll_d]
 
-        if umax_cpl is not None:
-            constrlist += [u_cpl <= umax_cpl]  # input constraints
-        if umin_cpl is not None:
-            constrlist += [u_cpl >= umin_cpl]  # input constraints
+        if u_max_cpl is not None:
+            constraints += [u_cpl <= u_max_cpl]  # input constraints
+        if u_min_cpl is not None:
+            constraints += [u_cpl >= u_min_cpl]  # input constraints
 
-        constrlist += [x_cpl[:, 0] == x0_cpl]  # inital state constraints    
+        constraints += [x_cpl[:, 0] == x0_cpl]  # inital state constraints    
 
     # Solve 
-    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constrlist)
+    prob = cvxpy.Problem(cvxpy.Minimize(costlist), constraints)
     prob.solve(verbose=False)
     cost_val = prob.value
 
     return x_mes.value, x_cpl.value, u_mes.value, u_cpl.value, cost_val
 
+
+def create_state_update_equation_constraint(A, B, C, v, t, u, x):
+    # y_t = x[:, t]
+    # y_t = C * x[:, t]
+    y_t = C * x[:, t] + v
+    # print('###########start')
+    # print('A: ' + str(A))
+    # print('B: ' + str(B))
+    # print('C: ' + str(C))
+    # print('v: ' + str(v))
+    # print('###########end')
+    return [x[:, t + 1] == A * y_t + B * u[:, t]]
+
+
+def create_max_min_state_constraints(t, x, x_max, x_min):
+    max_min_state_constraints = []
+    if x_min is not None:
+        min_state_constraint = x[:, t] >= x_min[:, 0]
+        max_min_state_constraints.append(min_state_constraint)
+    if x_max is not None:
+        max_state_constraint = x[:, t] <= x_max[:, 0]
+        max_min_state_constraints.append(max_state_constraint)
+
+    return max_min_state_constraints
+
+
+def create_initial_state_constraint(x, x0):
+    return [x[:, 0] == x0]
+
+
+def create_input_constraints(u, u_max, u_min):
+    input_constraints = []
+    if u_max is not None:
+        max_constraint = u <= u_max
+        input_constraints.append(max_constraint)
+    if u_min is not None:
+        min_constraint = u >= u_min
+        input_constraints.append(min_constraint)
+
+    return input_constraints
+
+
+def create_min_distance_constraints(a_dim, coll_d, nx, t, x):
+    min_distance_constraints = []
+    if coll_d is None:
+        return []
+
+    # TODO: make convex
+    num_agents = nx // a_dim
+    for idx in range(num_agents):
+        for jdx in range(idx + 1, num_agents):
+            agent_i_center = x[idx * a_dim : (idx + 1) * a_dim, t]
+            agent_j_center = x[jdx * a_dim : (jdx + 1) * a_dim, t]
+            min_distance_constraint = cvxpy.norm1(agent_i_center - agent_j_center) >= coll_d
+            min_distance_constraints.append(min_distance_constraint)
+
+    return min_distance_constraints[:0]
+
+
+def create_avoid_obstacle_constraints(a_dim, coll_d, nx, t, x, obstacles):
+    avoid_obstacle_constraints = []
+    if coll_d is None or obstacles is None:
+        return []
+
+    # TODO: make convex
+    num_agents = nx // a_dim
+    for idx in range(num_agents):
+        for obstacle in obstacles:
+            agent_i_center = x[idx * a_dim : (idx + 1) * a_dim, t]
+            avoid_obstacle_constraint = cvxpy.norm1(agent_i_center - obstacle['center']) >= coll_d + obstacle['radius']
+            # avoid_obstacle_constraint = cvxpy.norm1(agent_i_center - obstacle['center']) >= coll_d + obstacle['radius']
+            avoid_obstacle_constraints.append(avoid_obstacle_constraint)
+
+    return avoid_obstacle_constraints
